@@ -3,9 +3,8 @@ name = "pollinations-ai-pro"
 compatibility_date = "2024-12-16"
 compatibility_flags = [ "nodejs_compat" ]
 
-# 觀察性配置
 [observability]
 enabled = true
 
-# [注意] 不要在此處添加 pages_build_output_dir
-# [注意] API Key 請使用 npx wrangler secret put POLLINATIONS_API_KEY
+# 注意：不要在此處添加 pages_build_output_dir
+
