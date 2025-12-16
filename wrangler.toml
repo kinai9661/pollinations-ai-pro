@@ -1,29 +1,11 @@
-# 應用名稱 (請確保這與你在 Cloudflare Dashboard 上想看到的名稱一致)
+#:schema node_modules/wrangler/config-schema.json
 name = "pollinations-ai-pro"
-
-# 兼容性日期 (使用最新的日期以獲得最佳特性支持)
 compatibility_date = "2024-12-16"
-
-# 啟用 Node.js 兼容模式 (Next.js 15 App Router 在 Workers 上運行的關鍵)
 compatibility_flags = [ "nodejs_compat" ]
 
-# [可選] Cloudflare Pages 構建輸出目錄
-# 當使用 autoconfig 時，Wrangler 通常會自動處理，但顯式指定更安全
-pages_build_output_dir = ".vercel/output/static"
+# 觀察性配置
+[observability]
+enabled = true
 
-# [可選] 如果你想在 wrangler.toml 中設置公開的環境變量 (非敏感信息)
-# 注意：API KEY 等敏感信息請使用 `npx wrangler secret put`，不要寫在這裡！
-[vars]
-NEXT_PUBLIC_APP_VERSION = "1.0.0"
-NEXT_PUBLIC_MODEL_NAME = "Flux.1 Schnell"
-
-# [進階] 如果你將來決定啟用 R2 存儲 (方案 C)，可以解開以下註釋
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "your-bucket-name"
-
-# [進階] 如果你將來決定啟用 D1 數據庫 (方案 C)，可以解開以下註釋
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "your-database-name"
-# database_id = "your-database-id"
+# [注意] 不要在此處添加 pages_build_output_dir
+# [注意] API Key 請使用 npx wrangler secret put POLLINATIONS_API_KEY
