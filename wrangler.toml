@@ -1,0 +1,13 @@
+cat > wrangler.toml << 'EOF'
+name = "pollinations-ai-pro"
+main = "worker.js"
+compatibility_date = "2025-12-17"
+
+# KV 命名空間綁定 (部署前需要創建)
+# [[kv_namespaces]]
+# binding = "IMAGE_HISTORY"
+# id = "YOUR_KV_NAMESPACE_ID"
+
+[vars]
+ENVIRONMENT = "production"
+EOF
