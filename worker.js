@@ -1,1858 +1,2619 @@
-// worker.js - Pollinations AI Pro
-// 版本: 1.0.0
-// 作者: kinai9661
+// =================================================================================
+//  項目: Flux-AI-Pro (重建優化版)
+//  版本: 10.0.0
+//  作者: AI Assistant
+//  日期: 2025-12-17
+//  功能: 完整 UI | 17模型 | 39風格 | Seed控制 | 批量生成 | 圖生圖 | 中文支持
+//  優化: 代碼重構 | 詳細註釋 | 錯誤處理增強 | 性能優化
+// =================================================================================
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    
-    // CORS 處理
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, DELETE',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    };
-    
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+// ==================== 配置層 ====================
+
+/**
+ * 全局配置對象
+ * 包含所有模型、風格、尺寸、優化規則的配置
+ */
+const CONFIG = {
+  // 項目基本信息
+  PROJECT_NAME: "Flux-AI-Pro",
+  PROJECT_VERSION: "10.0.0",
+  API_MASTER_KEY: "1",
+  
+  // 圖像生成提供商配置
+  PROVIDERS: {
+    pollinations: {
+      name: "Pollinations.ai",
+      endpoint: "https://image.pollinations.ai",
+      type: "direct",
+      auth_mode: "free",
+      requires_key: false,
+      enabled: true,
+      default: true,
+      description: "完全免費的 AI 圖像生成服務",
+      
+      // 功能特性
+      features: {
+        private_mode: true,           // 私密模式
+        custom_size: true,            // 自定義尺寸
+        seed_control: true,           // Seed 控制
+        negative_prompt: true,        // 負面提示詞
+        enhance: true,                // 增強模式
+        nologo: true,                 // 無水印
+        style_presets: true,          // 風格預設
+        auto_hd: true,                // 自動 HD
+        quality_modes: true,          // 質量模式
+        auto_translate: true,         // 自動翻譯
+        ultra_hd_4k: true,            // 4K 超清
+        reference_images: true,       // 參考圖
+        image_to_image: true,         // 圖生圖
+        multi_image_fusion: true,     // 多圖融合
+        batch_generation: true        // 批量生成
+      },
+      
+      // 支持的模型列表（17個）
+      models: [
+        // ⚡ Flux 系列（7個）
+        { 
+          id: "flux", 
+          name: "Flux", 
+          confirmed: true, 
+          category: "flux", 
+          description: "均衡速度與質量，通用首選", 
+          max_size: 2048 
+        },
+        { 
+          id: "flux-realism", 
+          name: "Flux Realism", 
+          confirmed: true, 
+          category: "flux", 
+          description: "超寫實照片風格", 
+          max_size: 2048 
+        },
+        { 
+          id: "flux-anime", 
+          name: "Flux Anime", 
+          confirmed: true, 
+          category: "flux", 
+          description: "日系動漫風格", 
+          max_size: 2048 
+        },
+        { 
+          id: "flux-3d", 
+          name: "Flux 3D", 
+          confirmed: true, 
+          category: "flux", 
+          description: "3D 渲染風格", 
+          max_size: 2048 
+        },
+        { 
+          id: "flux-pro", 
+          name: "Flux Pro", 
+          confirmed: true, 
+          category: "flux", 
+          description: "專業版最高質量", 
+          max_size: 2048 
+        },
+        { 
+          id: "any-dark", 
+          name: "Any Dark", 
+          confirmed: true, 
+          category: "flux", 
+          description: "暗黑風格", 
+          max_size: 2048 
+        },
+        { 
+          id: "turbo", 
+          name: "Turbo", 
+          confirmed: true, 
+          category: "flux", 
+          description: "極速生成", 
+          max_size: 2048 
+        },
+        
+        // 🔥 Flux 進階系列（3個）
+        { 
+          id: "flux-1.1-pro", 
+          name: "Flux 1.1 Pro 🔥", 
+          confirmed: false, 
+          fallback: ["flux-pro", "flux-realism"], 
+          experimental: true, 
+          category: "flux-advanced", 
+          description: "最新 Flux 1.1，更強細節", 
+          max_size: 2048 
+        },
+        { 
+          id: "flux-kontext", 
+          name: "Flux Kontext 🎨", 
+          confirmed: false, 
+          fallback: ["flux-pro", "flux-realism"], 
+          experimental: true, 
+          category: "flux-advanced", 
+          description: "圖像編輯（1張參考圖）", 
+          max_size: 2048,
+          supports_reference_images: true,
+          max_reference_images: 1
+        },
+        { 
+          id: "flux-kontext-pro", 
+          name: "Flux Kontext Pro 💎", 
+          confirmed: false, 
+          fallback: ["flux-kontext", "flux-pro"], 
+          experimental: true, 
+          category: "flux-advanced", 
+          description: "圖像編輯專業版（1張參考圖）", 
+          max_size: 2048,
+          supports_reference_images: true,
+          max_reference_images: 1
+        },
+        
+        // 🍌 Nano Banana 系列（2個）
+        { 
+          id: "nanobanana", 
+          name: "Nano Banana 🍌", 
+          confirmed: true, 
+          category: "gemini", 
+          description: "Gemini 2.5 Flash（4張參考圖）", 
+          max_size: 2048,
+          supports_reference_images: true,
+          max_reference_images: 4
+        },
+        { 
+          id: "nanobanana-pro", 
+          name: "Nano Banana Pro 🍌💎", 
+          confirmed: true, 
+          category: "gemini", 
+          description: "Gemini 3 Pro（4K + 4張參考圖）", 
+          max_size: 4096,
+          ultra_hd: true,
+          supports_reference_images: true,
+          max_reference_images: 4
+        },
+        
+        // ⚡ Stable Diffusion 系列（5個）
+        { 
+          id: "sd3", 
+          name: "Stable Diffusion 3 ⚡", 
+          confirmed: false, 
+          fallback: ["flux-realism", "flux"], 
+          experimental: true, 
+          category: "stable-diffusion", 
+          description: "SD3 標準版", 
+          max_size: 2048 
+        },
+        { 
+          id: "sd3.5-large", 
+          name: "SD 3.5 Large 🔥", 
+          confirmed: false, 
+          fallback: ["sd3", "flux-realism"], 
+          experimental: true, 
+          category: "stable-diffusion", 
+          description: "SD 3.5 大模型", 
+          max_size: 2048 
+        },
+        { 
+          id: "sd3.5-turbo", 
+          name: "SD 3.5 Turbo ⚡", 
+          confirmed: false, 
+          fallback: ["turbo", "flux"], 
+          experimental: true, 
+          category: "stable-diffusion", 
+          description: "SD 3.5 快速版", 
+          max_size: 2048 
+        },
+        { 
+          id: "sdxl", 
+          name: "SDXL 📐", 
+          confirmed: false, 
+          fallback: ["flux-realism", "flux"], 
+          experimental: true, 
+          category: "stable-diffusion", 
+          description: "經典 SDXL", 
+          max_size: 2048 
+        },
+        { 
+          id: "sdxl-lightning", 
+          name: "SDXL Lightning ⚡", 
+          confirmed: false, 
+          fallback: ["turbo", "flux"], 
+          experimental: true, 
+          category: "stable-diffusion", 
+          description: "SDXL 極速版", 
+          max_size: 2048 
+        }
+      ],
+      
+      rate_limit: null,
+      max_size: { width: 4096, height: 4096 }
     }
+  },
+  
+  DEFAULT_PROVIDER: "pollinations",
+  
+  // 藝術風格預設（39種）
+  STYLE_PRESETS: {
+    none: { 
+      name: "無（使用原始提示詞）", 
+      prompt: "", 
+      negative: "" 
+    },
     
-    // API 路由映射
-    const routes = {
-      '/api/generate': () => handleGenerate(request, env),
-      '/api/img2img': () => handleImg2Img(request, env),
-      '/api/inpaint': () => handleInpaint(request, env),
-      '/api/batch': () => handleBatch(request, env),
-      '/api/history': () => handleHistory(request, env),
-      '/api/history/delete': () => handleDeleteHistory(request, env),
-      '/api/optimize-prompt': () => handleOptimizePrompt(request, env),
-      '/api/styles': () => handleGetStyles(request, env)
-    };
+    // 🎌 動漫系列（6種）
+    anime: { 
+      name: "動漫風格 ✨", 
+      prompt: "anime style, anime art, vibrant colors, anime character, detailed anime", 
+      negative: "realistic, photograph, 3d, ugly" 
+    },
+    "anime-chibi": { 
+      name: "Q版動漫 🎎", 
+      prompt: "chibi style, cute chibi character, big eyes, small body, kawaii, adorable", 
+      negative: "realistic, tall, adult proportions, serious" 
+    },
+    "japanese-manga": { 
+      name: "日本漫畫 📚", 
+      prompt: "manga style, black and white manga, screentone, manga panel, Japanese comic art", 
+      negative: "colored, realistic, photograph, western comic" 
+    },
+    "shoujo-manga": { 
+      name: "少女漫畫 💕", 
+      prompt: "shoujo manga style, sparkles, flowers background, big expressive eyes, romantic", 
+      negative: "shounen, action, dark, gritty" 
+    },
+    "seinen-manga": { 
+      name: "青年漫畫 🗡️", 
+      prompt: "seinen manga style, detailed linework, realistic anatomy, mature themes", 
+      negative: "childish, cute, simple, cartoon" 
+    },
+    "studio-ghibli": { 
+      name: "吉卜力風格 🍃", 
+      prompt: "Studio Ghibli style, Hayao Miyazaki, anime, soft colors, whimsical, hand-drawn", 
+      negative: "realistic, dark, 3D, western animation" 
+    },
     
-    if (routes[url.pathname]) {
-      const response = await routes[url.pathname]();
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      return response;
+    // 📷 寫實系列（3種）
+    photorealistic: { 
+      name: "寫實照片 📷", 
+      prompt: "photorealistic, ultra realistic, 8k uhd, professional photography, detailed, sharp focus", 
+      negative: "anime, cartoon, illustration, painting, drawing, art" 
+    },
+    cinematic: { 
+      name: "電影級 🎬", 
+      prompt: "cinematic lighting, movie still, dramatic lighting, film grain, depth of field, bokeh", 
+      negative: "amateur, flat lighting, overexposed, cartoon" 
+    },
+    portrait: { 
+      name: "人像攝影 👤", 
+      prompt: "professional portrait, studio lighting, bokeh background, 85mm lens, perfect skin", 
+      negative: "full body, landscape, distorted face, bad lighting" 
+    },
+    
+    // 🖌️ 傳統繪畫（8種）
+    "oil-painting": { 
+      name: "油畫 🎨", 
+      prompt: "oil painting, classical oil painting style, visible brushstrokes, rich colors, canvas texture", 
+      negative: "photograph, digital art, anime, flat" 
+    },
+    watercolor: { 
+      name: "水彩畫 💧", 
+      prompt: "watercolor painting, soft colors, watercolor texture, hand-painted, paper texture", 
+      negative: "photograph, digital, sharp edges, 3d" 
+    },
+    "chinese-painting": { 
+      name: "中國水墨畫 🖌️", 
+      prompt: "Chinese ink painting, sumi-e style, traditional Chinese art, brush painting, black ink", 
+      negative: "colorful, western, digital, photograph" 
+    },
+    "ukiyo-e": { 
+      name: "浮世繪 🗾", 
+      prompt: "ukiyo-e style, Japanese woodblock print, Hokusai style, flat colors, bold outlines", 
+      negative: "3d, realistic, photograph, modern" 
+    },
+    sketch: { 
+      name: "素描 ✏️", 
+      prompt: "pencil sketch, hand-drawn, sketch art, graphite drawing, cross-hatching", 
+      negative: "colored, painted, digital, photograph" 
+    },
+    charcoal: { 
+      name: "炭筆畫 🖍️", 
+      prompt: "charcoal drawing, charcoal sketch, dramatic shading, black and white, expressive strokes", 
+      negative: "colored, digital, clean lines, photograph" 
+    },
+    impressionism: { 
+      name: "印象派 🌅", 
+      prompt: "impressionism style, visible brushstrokes, emphasis on light, Monet, soft focus", 
+      negative: "sharp, detailed, photorealistic, digital" 
+    },
+    surrealism: { 
+      name: "超現實主義 🌀", 
+      prompt: "surrealism, dreamlike, Salvador Dali style, impossible geometry, bizarre", 
+      negative: "realistic, ordinary, conventional, logical" 
+    },
+    
+    // 💻 數位藝術（4種）
+    "digital-art": { 
+      name: "數位藝術 💻", 
+      prompt: "digital art, digital painting, concept art, artstation, highly detailed, vibrant colors", 
+      negative: "photograph, traditional art, sketch, low quality" 
+    },
+    "pixel-art": { 
+      name: "像素藝術 🕹️", 
+      prompt: "pixel art, 8-bit style, retro gaming, pixelated, limited color palette", 
+      negative: "high resolution, smooth, realistic, blurry" 
+    },
+    "vector-art": { 
+      name: "向量藝術 📐", 
+      prompt: "vector art, flat design, clean lines, geometric shapes, minimalist", 
+      negative: "realistic, textured, sketchy, photograph" 
+    },
+    "low-poly": { 
+      name: "低多邊形 🔷", 
+      prompt: "low poly art, geometric, faceted, 3D low poly, minimalist 3D", 
+      negative: "high poly, realistic, smooth, curved" 
+    },
+    
+    // 🌌 幻想科幻（7種）
+    fantasy: { 
+      name: "奇幻風格 🐉", 
+      prompt: "fantasy art, magical, epic fantasy, detailed fantasy illustration, mystical", 
+      negative: "modern, realistic, mundane, contemporary" 
+    },
+    "dark-fantasy": { 
+      name: "黑暗奇幻 🌑", 
+      prompt: "dark fantasy, gothic, dark atmosphere, ominous, sinister, dramatic shadows", 
+      negative: "bright, cheerful, cute, colorful" 
+    },
+    "fairy-tale": { 
+      name: "童話風格 🧚", 
+      prompt: "fairy tale art, storybook illustration, whimsical, magical, enchanted forest", 
+      negative: "realistic, modern, dark, gritty" 
+    },
+    cyberpunk: { 
+      name: "賽博朋克 🌃", 
+      prompt: "cyberpunk style, neon lights, futuristic, sci-fi, dystopian, blade runner style", 
+      negative: "natural, rustic, medieval, fantasy" 
+    },
+    "sci-fi": { 
+      name: "科幻未來 🚀", 
+      prompt: "sci-fi, futuristic, advanced technology, space age, sleek design, holographic", 
+      negative: "medieval, fantasy, historical, primitive" 
+    },
+    steampunk: { 
+      name: "蒸汽朋克 ⚙️", 
+      prompt: "steampunk style, Victorian era, brass and copper, gears and cogs, mechanical", 
+      negative: "modern, digital, minimalist, clean" 
+    },
+    vaporwave: { 
+      name: "蒸氣波 🌈", 
+      prompt: "vaporwave aesthetic, retro 80s, neon pink and cyan, glitch art, nostalgic", 
+      negative: "realistic, modern, natural colors" 
+    },
+    
+    // 🎬 動畫影視（2種）
+    disney: { 
+      name: "迪士尼風格 🏰", 
+      prompt: "Disney animation style, 3D animated, Pixar style, colorful, expressive characters", 
+      negative: "realistic, anime, dark, gritty" 
+    },
+    "comic-book": { 
+      name: "美式漫畫 💥", 
+      prompt: "comic book style, bold lines, halftone dots, superhero comic, dynamic pose", 
+      negative: "realistic, photograph, manga, soft" 
+    },
+    
+    // 🎭 藝術流派（6種）
+    "pop-art": { 
+      name: "普普藝術 🎭", 
+      prompt: "pop art style, Andy Warhol, Roy Lichtenstein, bold colors, halftone, retro", 
+      negative: "realistic, subtle, muted colors, classical" 
+    },
+    "art-deco": { 
+      name: "裝飾藝術 💎", 
+      prompt: "art deco style, geometric patterns, luxurious, elegant, 1920s, gold and black", 
+      negative: "organic, natural, messy, modern minimalist" 
+    },
+    "art-nouveau": { 
+      name: "新藝術風格 🌺", 
+      prompt: "art nouveau style, flowing lines, organic forms, floral motifs, elegant curves", 
+      negative: "geometric, modern, minimalist, angular" 
+    },
+    abstract: { 
+      name: "抽象藝術 🎨", 
+      prompt: "abstract art, non-representational, geometric shapes, bold colors, expressive", 
+      negative: "realistic, detailed, representational, photographic" 
+    },
+    minimalist: { 
+      name: "極簡主義 ⬜", 
+      prompt: "minimalist art, simple, clean lines, negative space, limited color palette, modern", 
+      negative: "detailed, complex, ornate, cluttered" 
+    },
+    
+    // 🎨 特殊風格（3種）
+    graffiti: { 
+      name: "塗鴉藝術 🎨", 
+      prompt: "graffiti art, street art, spray paint, urban, bold colors, wild style lettering", 
+      negative: "classical, refined, photorealistic, corporate" 
+    },
+    horror: { 
+      name: "恐怖風格 👻", 
+      prompt: "horror art, creepy, disturbing, dark atmosphere, unsettling, macabre", 
+      negative: "cute, bright, cheerful, wholesome" 
+    },
+    kawaii: { 
+      name: "可愛風格 🌸", 
+      prompt: "kawaii style, cute, adorable, pastel colors, Japanese cute culture, soft", 
+      negative: "realistic, dark, scary, mature" 
     }
+  },
+  
+  // 參數優化規則
+  OPTIMIZATION_RULES: {
+    // 不同模型的最佳步數範圍
+    MODEL_STEPS: {
+      "turbo": { min: 4, optimal: 8, max: 12 },
+      "sdxl-lightning": { min: 4, optimal: 6, max: 10 },
+      "sd3.5-turbo": { min: 8, optimal: 12, max: 20 },
+      "flux": { min: 15, optimal: 20, max: 30 },
+      "flux-anime": { min: 15, optimal: 20, max: 30 },
+      "flux-3d": { min: 15, optimal: 22, max: 35 },
+      "sd3": { min: 18, optimal: 25, max: 35 },
+      "sdxl": { min: 20, optimal: 28, max: 40 },
+      "flux-realism": { min: 20, optimal: 28, max: 40 },
+      "flux-pro": { min: 25, optimal: 32, max: 45 },
+      "flux-1.1-pro": { min: 20, optimal: 28, max: 40 },
+      "sd3.5-large": { min: 25, optimal: 35, max: 50 },
+      "flux-kontext": { min: 22, optimal: 30, max: 40 },
+      "flux-kontext-pro": { min: 25, optimal: 35, max: 45 },
+      "any-dark": { min: 18, optimal: 24, max: 35 },
+      "nanobanana": { min: 15, optimal: 22, max: 30 },
+      "nanobanana-pro": { min: 25, optimal: 35, max: 50 }
+    },
     
-    // 返回前端 HTML
-    return new Response(getHTML(), {
-      headers: { 
-        'Content-Type': 'text/html;charset=UTF-8',
-        'Cache-Control': 'public, max-age=3600'
+    // 尺寸對步數的影響係數
+    SIZE_MULTIPLIER: {
+      small: { threshold: 512 * 512, multiplier: 0.8 },
+      medium: { threshold: 1024 * 1024, multiplier: 1.0 },
+      large: { threshold: 1536 * 1536, multiplier: 1.15 },
+      xlarge: { threshold: 2048 * 2048, multiplier: 1.3 },
+      ultra_4k: { threshold: 4096 * 4096, multiplier: 1.5 }
+    },
+    
+    // 風格對步數的影響係數
+    STYLE_ADJUSTMENT: {
+      "photorealistic": 1.1,
+      "oil-painting": 1.05,
+      "watercolor": 0.95,
+      "sketch": 0.9,
+      "default": 1.0
+    }
+  },
+  
+  // HD 畫質優化配置
+  HD_OPTIMIZATION: {
+    enabled: true,
+    
+    // 4種質量模式
+    QUALITY_MODES: {
+      economy: { 
+        name: "經濟模式", 
+        description: "快速出圖，適合測試", 
+        min_resolution: 1024, 
+        max_resolution: 2048, 
+        steps_multiplier: 0.85, 
+        guidance_multiplier: 0.9, 
+        hd_level: "basic" 
+      },
+      standard: { 
+        name: "標準模式", 
+        description: "平衡質量與速度", 
+        min_resolution: 1280, 
+        max_resolution: 2048, 
+        steps_multiplier: 1.0, 
+        guidance_multiplier: 1.0, 
+        hd_level: "enhanced" 
+      },
+      ultra: { 
+        name: "超高清模式", 
+        description: "極致質量，耗時較長", 
+        min_resolution: 1536, 
+        max_resolution: 4096, 
+        steps_multiplier: 1.35, 
+        guidance_multiplier: 1.15, 
+        hd_level: "maximum", 
+        force_upscale: true 
+      },
+      ultra_4k: { 
+        name: "4K超高清", 
+        description: "Nano Banana Pro 專屬", 
+        min_resolution: 2048, 
+        max_resolution: 4096, 
+        steps_multiplier: 1.5, 
+        guidance_multiplier: 1.2, 
+        hd_level: "ultra_4k", 
+        force_upscale: true, 
+        exclusive_models: ["nanobanana-pro"] 
       }
-    });
+    },
+    
+    // HD 提示詞增強
+    HD_PROMPTS: {
+      basic: "high quality, detailed, sharp",
+      enhanced: "high quality, extremely detailed, sharp focus, crisp, clear, professional, 8k uhd",
+      maximum: "ultra high quality, extremely detailed, razor sharp focus, crystal clear, professional grade, 8k uhd, masterpiece, fine details",
+      ultra_4k: "ultra high definition 4K quality, extreme detail precision, professional grade, pixel-perfect clarity, masterpiece quality"
+    },
+    
+    // HD 負面提示詞
+    HD_NEGATIVE: "low quality, blurry, pixelated, low resolution, jpeg artifacts, bad quality, distorted, noisy, grainy",
+    
+    // 模型專屬質量配置
+    MODEL_QUALITY_PROFILES: {
+      "flux-realism": { 
+        priority: "ultra_detail", 
+        min_resolution: 1536, 
+        max_resolution: 2048, 
+        optimal_steps_boost: 1.25, 
+        guidance_boost: 1.15, 
+        recommended_quality: "ultra" 
+      },
+      "flux-pro": { 
+        priority: "maximum_quality", 
+        min_resolution: 1536, 
+        max_resolution: 2048, 
+        optimal_steps_boost: 1.3, 
+        guidance_boost: 1.2, 
+        recommended_quality: "ultra" 
+      },
+      "flux-1.1-pro": { 
+        priority: "maximum_quality", 
+        min_resolution: 1536, 
+        max_resolution: 2048, 
+        optimal_steps_boost: 1.25, 
+        guidance_boost: 1.15, 
+        recommended_quality: "ultra" 
+      },
+      "nanobanana-pro": { 
+        priority: "ultra_4k_multi", 
+        min_resolution: 2048, 
+        max_resolution: 4096, 
+        optimal_steps_boost: 1.5, 
+        guidance_boost: 1.25, 
+        recommended_quality: "ultra_4k" 
+      },
+      "turbo": { 
+        priority: "speed", 
+        min_resolution: 1024, 
+        max_resolution: 2048, 
+        optimal_steps_boost: 0.7, 
+        guidance_boost: 0.85, 
+        recommended_quality: "economy" 
+      }
+    }
+  },
+  
+  // 請求超時設置
+  FETCH_TIMEOUT: 90000,  // 90秒
+  MAX_RETRIES: 3,        // 最大重試次數
+  
+  // 尺寸預設（33種）
+  PRESET_SIZES: {
+    // ⬜ 方形系列（5種）
+    "square-512": { width: 512, height: 512, name: "方形 512px（快速測試）" },
+    "square-1k": { width: 1024, height: 1024, name: "方形 1K（標準）" },
+    "square-1.5k": { width: 1536, height: 1536, name: "方形 1.5K（高清）" },
+    "square-2k": { width: 2048, height: 2048, name: "方形 2K（超清）" },
+    "square-4k": { width: 4096, height: 4096, name: "方形 4K 🍌", exclusive: ["nanobanana-pro"] },
+    
+    // 📱 豎屏系列（6種）
+    "portrait-9-16": { width: 768, height: 1344, name: "豎屏 9:16（TikTok/Story）" },
+    "portrait-9-16-hd": { width: 1080, height: 1920, name: "豎屏 9:16 HD（1080p）" },
+    "portrait-9-16-2k": { width: 1536, height: 2688, name: "豎屏 9:16 2K" },
+    "portrait-3-4": { width: 768, height: 1024, name: "豎屏 3:4（Instagram）" },
+    "portrait-3-4-hd": { width: 1152, height: 1536, name: "豎屏 3:4 HD" },
+    "portrait-2-3": { width: 1024, height: 1536, name: "豎屏 2:3（Pinterest）" },
+    
+    // 🖥️ 橫屏系列（6種）
+    "landscape-16-9": { width: 1344, height: 768, name: "橫屏 16:9（YouTube）" },
+    "landscape-16-9-hd": { width: 1920, height: 1080, name: "橫屏 16:9 HD（1080p）" },
+    "landscape-16-9-2k": { width: 2560, height: 1440, name: "橫屏 16:9 2K（1440p）" },
+    "landscape-16-9-4k": { width: 3840, height: 2160, name: "橫屏 16:9 4K 🍌", exclusive: ["nanobanana-pro"] },
+    "landscape-4-3": { width: 1024, height: 768, name: "橫屏 4:3（傳統）" },
+    "landscape-21-9": { width: 2560, height: 1080, name: "橫屏 21:9（超寬螢幕）" },
+    
+    // 📲 社交媒體（7種）
+    "instagram-square": { width: 1080, height: 1080, name: "Instagram 方形貼文" },
+    "instagram-portrait": { width: 1080, height: 1350, name: "Instagram 豎屏貼文（4:5）" },
+    "instagram-story": { width: 1080, height: 1920, name: "Instagram Story/Reels" },
+    "facebook-cover": { width: 2048, height: 1152, name: "Facebook 封面（16:9）" },
+    "twitter-header": { width: 1500, height: 500, name: "Twitter/X 橫幅（3:1）" },
+    "youtube-thumbnail": { width: 1280, height: 720, name: "YouTube 縮圖" },
+    "linkedin-banner": { width: 1584, height: 396, name: "LinkedIn 橫幅" },
+    
+    // 🖨️ 印刷/設計（3種）
+    "a4-portrait": { width: 2480, height: 3508, name: "A4 豎屏（300 DPI）" },
+    "a4-landscape": { width: 3508, height: 2480, name: "A4 橫屏（300 DPI）" },
+    "poster-24-36": { width: 2400, height: 3600, name: "海報 24x36 英吋" },
+    
+    // 🖼️ 桌布系列（5種）
+    "wallpaper-fhd": { width: 1920, height: 1080, name: "桌布 Full HD（1080p）" },
+    "wallpaper-2k": { width: 2560, height: 1440, name: "桌布 2K（1440p）" },
+    "wallpaper-4k": { width: 3840, height: 2160, name: "桌布 4K 🍌", exclusive: ["nanobanana-pro"] },
+    "wallpaper-ultrawide": { width: 3440, height: 1440, name: "桌布 Ultra-Wide（21:9）" },
+    "mobile-wallpaper": { width: 1242, height: 2688, name: "手機桌布（iPhone）" },
+    
+    // 🔧 自定義
+    "custom": { width: 1024, height: 1024, name: "自定義尺寸" }
+  },
+  
+  // 歷史記錄配置
+  HISTORY: {
+    MAX_ITEMS: 100,
+    STORAGE_KEY: "flux_ai_history"
   }
 };
-// 文生圖處理
-async function handleGenerate(request, env) {
-  try {
-    const { prompt, negativePrompt, model, width, height, seed, style } = await request.json();
-    
-    if (!prompt || prompt.trim() === '') {
-      return jsonResponse({ success: false, error: 'Prompt is required' }, 400);
-    }
-    
-    // 應用風格預設
-    let finalPrompt = prompt;
-    if (style && style !== 'none') {
-      const styles = getStylePresets();
-      const selectedStyle = styles.find(s => s.id === style);
-      if (selectedStyle) {
-        finalPrompt = `${prompt}, ${selectedStyle.suffix}`;
-      }
-    }
-    
-    // 構建 Pollinations API 參數
-    const params = new URLSearchParams({
-      width: width || 1024,
-      height: height || 1024,
-      seed: seed || Math.floor(Math.random() * 999999999),
-      model: model || 'flux',
-      nologo: 'true',
-      enhance: 'true',
-      safe: 'true'
-    });
-    
-    if (negativePrompt && negativePrompt.trim() !== '') {
-      params.append('negative', negativePrompt);
-    }
-    
-    // 添加 API Token (如果設置)
-    if (env.POLLINATIONS_TOKEN) {
-      params.append('token', env.POLLINATIONS_TOKEN);
-    }
-    
-    // 調用 Pollinations API
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?${params}`;
-    const imageResponse = await fetch(imageUrl, {
-      headers: {
-        'User-Agent': 'Pollinations-AI-Pro/1.0'
-      }
-    });
-    
-    if (!imageResponse.ok) {
-      throw new Error(`API request failed: ${imageResponse.status}`);
-    }
-    
-    const imageBlob = await imageResponse.arrayBuffer();
-    
-    // 創建記錄
-    const record = {
-      id: crypto.randomUUID(),
-      type: 'text2img',
-      prompt: finalPrompt,
-      originalPrompt: prompt,
-      negativePrompt: negativePrompt || '',
-      model,
-      width: parseInt(params.get('width')),
-      height: parseInt(params.get('height')),
-      seed: params.get('seed'),
-      style: style || 'none',
-      timestamp: Date.now(),
-      url: imageUrl
-    };
-    
-    // 保存到歷史記錄
-    await saveToHistory(env, record);
-    
-    return jsonResponse({
-      success: true,
-      data: {
-        ...record,
-        image: arrayBufferToBase64(imageBlob)
-      }
-    });
-  } catch (error) {
-    console.error('Generate error:', error);
-    return jsonResponse({ 
-      success: false, 
-      error: error.message || 'Image generation failed' 
-    }, 500);
+
+/**
+ * API 優化配置
+ * 包含速率限制、緩存、壓縮、併發控制等設置
+ */
+const API_OPTIMIZATION = {
+  // 速率限制
+  RATE_LIMIT: {
+    enabled: true,
+    max_requests_per_minute: 10,      // 每分鐘最多10次
+    max_requests_per_hour: 100,       // 每小時最多100次
+    blacklist_duration: 3600000,      // 封禁時長1小時
+    whitelist_ips: []                 // 白名單IP
+  },
+  
+  // 緩存設置
+  CACHE: {
+    enabled: true,
+    ttl: 3600,          // 緩存有效期1小時
+    max_size: 100,      // 最多100項
+    strategy: 'lru'     // LRU策略
+  },
+  
+  // 壓縮設置
+  COMPRESSION: {
+    enabled: true,
+    threshold: 1024,
+    quality: 0.85
+  },
+  
+  // 併發控制
+  CONCURRENCY: {
+    max_parallel: 3,      // 最多3個並行請求
+    queue_limit: 10,      // 隊列上限
+    timeout: 120000       // 超時時間2分鐘
+  },
+  
+  // 性能監控
+  MONITORING: {
+    enabled: true,
+    log_requests: true,
+    track_errors: true,
+    performance_metrics: true
   }
-}
-// 圖生圖處理
-async function handleImg2Img(request, env) {
-  try {
-    const { prompt, referenceImage, strength, model, width, height, seed } = await request.json();
-    
-    if (!prompt) {
-      return jsonResponse({ success: false, error: 'Prompt is required' }, 400);
-    }
-    
-    const params = new URLSearchParams({
-      width: width || 1024,
-      height: height || 1024,
-      seed: seed || Math.floor(Math.random() * 999999999),
-      model: model || 'flux',
-      strength: Math.max(0, Math.min(1, strength || 0.75)),
-      nologo: 'true',
-      enhance: 'true'
-    });
-    
-    if (env.POLLINATIONS_TOKEN) {
-      params.append('token', env.POLLINATIONS_TOKEN);
-    }
-    
-    // Note: Pollinations 主要通過 URL 處理,實際 img2img 可能需要其他實現
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`;
-    const imageResponse = await fetch(imageUrl);
-    
-    if (!imageResponse.ok) {
-      throw new Error('Image generation failed');
-    }
-    
-    const imageBlob = await imageResponse.arrayBuffer();
-    
-    const record = {
-      id: crypto.randomUUID(),
-      type: 'img2img',
-      prompt,
-      model,
-      strength: parseFloat(params.get('strength')),
-      width: parseInt(params.get('width')),
-      height: parseInt(params.get('height')),
-      seed: params.get('seed'),
-      timestamp: Date.now(),
-      url: imageUrl
-    };
-    
-    await saveToHistory(env, record);
-    
-    return jsonResponse({
-      success: true,
-      data: {
-        ...record,
-        image: arrayBufferToBase64(imageBlob)
+};
+
+// ==================== 核心工具類 ====================
+
+/**
+ * 速率限制器
+ * 使用滑動窗口算法，防止API濫用
+ */
+class RateLimiter {
+  constructor() {
+    this.requests = new Map();      // IP → 時間戳數組
+    this.blacklist = new Map();     // IP → 封禁到期時間
+  }
+  
+  /**
+   * 檢查IP是否允許訪問
+   * @param {string} ip - 客戶端IP
+   * @returns {Object} - { allowed: boolean, reason?: string, retryAfter?: number }
+   */
+  async check(ip) {
+    // 1. 檢查黑名單
+    if (this.blacklist.has(ip)) {
+      const blockedUntil = this.blacklist.get(ip);
+      if (Date.now() < blockedUntil) {
+        return { 
+          allowed: false, 
+          reason: 'IP blocked', 
+          retryAfter: Math.ceil((blockedUntil - Date.now()) / 1000) 
+        };
+      } else {
+        this.blacklist.delete(ip);
       }
-    });
-  } catch (error) {
-    console.error('Img2Img error:', error);
-    return jsonResponse({ success: false, error: error.message }, 500);
+    }
+    
+    // 2. 檢查白名單
+    if (API_OPTIMIZATION.RATE_LIMIT.whitelist_ips.includes(ip)) {
+      return { allowed: true };
+    }
+    
+    // 3. 初始化請求記錄
+    const now = Date.now();
+    const oneMinute = 60 * 1000;
+    const oneHour = 60 * 60 * 1000;
+    
+    if (!this.requests.has(ip)) {
+      this.requests.set(ip, []);
+    }
+    
+    // 4. 清理過期記錄（超過1小時）
+    const userRequests = this.requests.get(ip);
+    const validRequests = userRequests.filter(time => now - time < oneHour);
+    this.requests.set(ip, validRequests);
+    
+    // 5. 檢查每分鐘限制
+    const recentRequests = validRequests.filter(time => now - time < oneMinute);
+    if (recentRequests.length >= API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute) {
+      return { 
+        allowed: false, 
+        reason: 'Too many requests per minute', 
+        limit: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute,
+        current: recentRequests.length
+      };
+    }
+    
+    // 6. 檢查每小時限制
+    if (validRequests.length >= API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour) {
+      // 超過小時限制，加入黑名單
+      this.blacklist.set(ip, now + API_OPTIMIZATION.RATE_LIMIT.blacklist_duration);
+      return { 
+        allowed: false, 
+        reason: 'Hourly limit exceeded', 
+        limit: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour,
+        blockedUntil: new Date(now + API_OPTIMIZATION.RATE_LIMIT.blacklist_duration).toISOString()
+      };
+    }
+    
+    // 7. 記錄本次請求
+    validRequests.push(now);
+    this.requests.set(ip, validRequests);
+    
+    return { 
+      allowed: true, 
+      remaining: {
+        perMinute: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute - recentRequests.length - 1,
+        perHour: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour - validRequests.length
+      }
+    };
+  }
+  
+  /**
+   * 重置IP限制（管理員功能）
+   * @param {string} ip - 客戶端IP
+   */
+  reset(ip) {
+    this.requests.delete(ip);
+    this.blacklist.delete(ip);
   }
 }
 
-// 局部重繪處理
-async function handleInpaint(request, env) {
-  try {
-    const { prompt, sourceImage, maskImage, model, width, height } = await request.json();
+/**
+ * LRU 緩存系統
+ * 最近最少使用策略，自動淘汰冷數據
+ */
+class SimpleCache {
+  constructor() {
+    this.cache = new Map();         // key → { value, expires }
+    this.accessTime = new Map();    // key → 最後訪問時間
+  }
+  
+  /**
+   * 獲取緩存
+   * @param {string} key - 緩存鍵
+   * @returns {*} - 緩存值或null
+   */
+  get(key) {
+    if (!API_OPTIMIZATION.CACHE.enabled) return null;
     
-    if (!prompt) {
-      return jsonResponse({ success: false, error: 'Prompt is required' }, 400);
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    const { value, expires } = cached;
+    
+    // 檢查是否過期
+    if (Date.now() > expires) {
+      this.cache.delete(key);
+      this.accessTime.delete(key);
+      return null;
     }
     
-    const params = new URLSearchParams({
-      width: width || 1024,
-      height: height || 1024,
-      model: model || 'flux',
-      nologo: 'true'
-    });
+    // 更新訪問時間（LRU）
+    this.accessTime.set(key, Date.now());
+    return value;
+  }
+  
+  /**
+   * 設置緩存
+   * @param {string} key - 緩存鍵
+   * @param {*} value - 緩存值
+   * @param {number} ttl - 有效期（秒）
+   */
+  set(key, value, ttl = API_OPTIMIZATION.CACHE.ttl) {
+    if (!API_OPTIMIZATION.CACHE.enabled) return;
     
-    if (env.POLLINATIONS_TOKEN) {
-      params.append('token', env.POLLINATIONS_TOKEN);
-    }
-    
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`;
-    const imageResponse = await fetch(imageUrl);
-    
-    if (!imageResponse.ok) {
-      throw new Error('Inpainting failed');
-    }
-    
-    const imageBlob = await imageResponse.arrayBuffer();
-    
-    const record = {
-      id: crypto.randomUUID(),
-      type: 'inpaint',
-      prompt,
-      model,
-      width: parseInt(params.get('width')),
-      height: parseInt(params.get('height')),
-      timestamp: Date.now(),
-      url: imageUrl
-    };
-    
-    await saveToHistory(env, record);
-    
-    return jsonResponse({
-      success: true,
-      data: {
-        ...record,
-        image: arrayBufferToBase64(imageBlob)
+    // 達到容量上限，淘汰最久未訪問項（LRU）
+    if (this.cache.size >= API_OPTIMIZATION.CACHE.max_size) {
+      let oldestKey = null;
+      let oldestTime = Date.now();
+      
+      for (const [k, time] of this.accessTime.entries()) {
+        if (time < oldestTime) {
+          oldestTime = time;
+          oldestKey = k;
+        }
       }
+      
+      if (oldestKey) {
+        this.cache.delete(oldestKey);
+        this.accessTime.delete(oldestKey);
+      }
+    }
+    
+    // 存入新緩存
+    this.cache.set(key, {
+      value: value,
+      expires: Date.now() + (ttl * 1000)
     });
-  } catch (error) {
-    console.error('Inpaint error:', error);
-    return jsonResponse({ success: false, error: error.message }, 500);
+    this.accessTime.set(key, Date.now());
+  }
+  
+  /**
+   * 清空所有緩存
+   */
+  clear() {
+    this.cache.clear();
+    this.accessTime.clear();
   }
 }
-// 批次生成處理
-async function handleBatch(request, env) {
-  try {
-    const { prompt, count, model, width, height, baseSeed } = await request.json();
+
+/**
+ * 性能監控器
+ * 記錄請求統計、成功率、平均耗時等
+ */
+class PerformanceMonitor {
+  constructor() {
+    this.metrics = {
+      total_requests: 0,
+      successful_requests: 0,
+      failed_requests: 0,
+      total_duration: 0,
+      avg_duration: 0,
+      errors: []  // 最多保存100條錯誤
+    };
+  }
+  
+  /**
+   * 記錄請求結果
+   * @param {boolean} success - 是否成功
+   * @param {number} duration - 耗時（毫秒）
+   * @param {string} error - 錯誤信息
+   */
+  recordRequest(success, duration, error = null) {
+    this.metrics.total_requests++;
+    this.metrics.total_duration += duration;
+    this.metrics.avg_duration = this.metrics.total_duration / this.metrics.total_requests;
     
-    if (!prompt) {
-      return jsonResponse({ success: false, error: 'Prompt is required' }, 400);
+    if (success) {
+      this.metrics.successful_requests++;
+    } else {
+      this.metrics.failed_requests++;
+      if (error && this.metrics.errors.length < 100) {
+        this.metrics.errors.push({
+          message: error,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
+  }
+  
+  /**
+   * 獲取統計數據
+   * @returns {Object} - 統計信息
+   */
+  getStats() {
+    return {
+      ...this.metrics,
+      success_rate: ((this.metrics.successful_requests / this.metrics.total_requests) * 100).toFixed(2) + '%',
+      avg_duration_ms: this.metrics.avg_duration.toFixed(2)
+    };
+  }
+  
+  /**
+   * 重置統計
+   */
+  reset() {
+    this.metrics = {
+      total_requests: 0,
+      successful_requests: 0,
+      failed_requests: 0,
+      total_duration: 0,
+      avg_duration: 0,
+      errors: []
+    };
+  }
+}
+
+// 初始化全局實例
+const rateLimiter = new RateLimiter();
+const apiCache = new SimpleCache();
+const perfMonitor = new PerformanceMonitor();
+
+/**
+ * 獲取客戶端真實IP
+ * @param {Request} request - 請求對象
+ * @returns {string} - 客戶端IP
+ */
+function getClientIP(request) {
+  return request.headers.get('CF-Connecting-IP') || 
+         (request.headers.get('X-Forwarded-For') ? 
+          request.headers.get('X-Forwarded-For').split(',')[0].trim() : null) || 
+         request.headers.get('X-Real-IP') || 
+         'unknown';
+}
+
+/**
+ * 生成緩存鍵
+ * 基於提示詞和主要參數生成唯一標識
+ * @param {string} prompt - 提示詞
+ * @param {Object} options - 生成選項
+ * @returns {string} - 緩存鍵
+ */
+function generateCacheKey(prompt, options) {
+  const keyData = {
+    prompt,
+    model: options.model,
+    width: options.width,
+    height: options.height,
+    style: options.style,
+    quality_mode: options.qualityMode,
+    seed: options.seed === -1 ? 'random' : options.seed
+  };
+  
+  // 簡單hash算法
+  const str = JSON.stringify(keyData);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  return 'cache_' + Math.abs(hash).toString(36);
+}
+
+/**
+ * 日誌記錄器
+ * 記錄生成過程的各個階段
+ */
+class Logger {
+  constructor() {
+    this.logs = [];
+  }
+  
+  /**
+   * 添加日誌
+   * @param {string} step - 步驟名稱
+   * @param {*} data - 日誌數據
+   */
+  add(step, data) {
+    const time = new Date().toISOString().split('T')[1].slice(0, -1);
+    this.logs.push({ time, step, data });
+    console.log(`[${step}]`, data);
+  }
+  
+  /**
+   * 獲取所有日誌
+   * @returns {Array} - 日誌數組
+   */
+  get() {
+    return this.logs;
+  }
+}
+// ==================== AI 功能層 ====================
+
+/**
+ * 中文翻譯引擎
+ * 使用 Cloudflare Workers AI 自動翻譯中文提示詞
+ * @param {string} text - 原始文本
+ * @param {Object} env - 環境變量
+ * @returns {Promise<Object>} - { text: string, translated: boolean, model?: string }
+ */
+async function translateToEnglish(text, env) {
+  // 檢測是否包含中文
+  const hasChinese = /[\u4e00-\u9fa5]/.test(text);
+  if (!hasChinese) {
+    return { text, translated: false };
+  }
+  
+  // 檢查是否有 Workers AI 綁定
+  if (!env?.AI) {
+    console.warn('Workers AI not available, using original text');
+    return { text, translated: false, reason: 'no_workers_ai' };
+  }
+  
+  try {
+    // 嘗試主模型: m2m100
+    const response = await env.AI.run("@cf/meta/m2m100-1.2b", {
+      text: text,
+      source_lang: "chinese",
+      target_lang: "english"
+    });
     
-    const batchCount = Math.min(Math.max(1, count || 4), 16); // 限制 1-16 張
-    const results = [];
+    if (response?.translated_text) {
+      console.log('[Translation] Success:', { original: text, translated: response.translated_text });
+      return { 
+        text: response.translated_text, 
+        translated: true,
+        model: "m2m100-1.2b",
+        original: text
+      };
+    }
+  } catch (primaryError) {
+    console.error('[Translation] Primary model failed:', primaryError.message);
     
-    for (let i = 0; i < batchCount; i++) {
-      const seed = baseSeed ? parseInt(baseSeed) + i : Math.floor(Math.random() * 999999999);
-      
-      const params = new URLSearchParams({
-        width: width || 1024,
-        height: height || 1024,
-        seed,
-        model: model || 'flux',
-        nologo: 'true',
-        enhance: 'true'
+    // 回退策略：嘗試備用模型
+    try {
+      const fallbackResponse = await env.AI.run("@cf/meta/m2m100-1.2b", {
+        text: text,
+        source_lang: "zh",
+        target_lang: "en"
       });
       
-      if (env.POLLINATIONS_TOKEN) {
-        params.append('token', env.POLLINATIONS_TOKEN);
-      }
-      
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params}`;
-      
-      try {
-        const imageResponse = await fetch(imageUrl);
-        if (!imageResponse.ok) continue;
-        
-        const imageBlob = await imageResponse.arrayBuffer();
-        
-        const record = {
-          id: crypto.randomUUID(),
-          type: 'batch',
-          prompt,
-          model,
-          width: parseInt(params.get('width')),
-          height: parseInt(params.get('height')),
-          seed,
-          batchIndex: i + 1,
-          timestamp: Date.now(),
-          url: imageUrl,
-          image: arrayBufferToBase64(imageBlob)
+      if (fallbackResponse?.translated_text) {
+        return { 
+          text: fallbackResponse.translated_text, 
+          translated: true,
+          model: "m2m100-1.2b-fallback" 
         };
-        
-        results.push(record);
-        await saveToHistory(env, record);
-      } catch (err) {
-        console.error(`Batch item ${i} failed:`, err);
       }
+    } catch (fallbackError) {
+      console.error('[Translation] Fallback model failed:', fallbackError.message);
+    }
+  }
+  
+  // 全部失敗，返回原文
+  console.warn('[Translation] All models failed, using original text');
+  return { text, translated: false, reason: 'translation_failed' };
+}
+
+/**
+ * 提示詞分析器
+ * 分析提示詞複雜度，智能推薦質量模式
+ */
+class PromptAnalyzer {
+  /**
+   * 分析提示詞複雜度
+   * @param {string} prompt - 提示詞
+   * @returns {number} - 複雜度評分 (0-1)
+   */
+  static analyzeComplexity(prompt) {
+    let score = 0;
+    
+    // 1. 關鍵詞檢測 (每個+0.1)
+    const complexityKeywords = [
+      'detailed', 'intricate', 'complex', 'elaborate', 'sophisticated',
+      'realistic', 'photorealistic', 'ultra realistic', 'hyper realistic',
+      'high quality', 'masterpiece', 'best quality', 'ultra detailed',
+      '4k', '8k', 'uhd', 'professional', 'cinematic',
+      'dramatic lighting', 'volumetric', 'ray tracing', 'global illumination'
+    ];
+    
+    complexityKeywords.forEach(keyword => {
+      if (prompt.toLowerCase().includes(keyword)) {
+        score += 0.1;
+      }
+    });
+    
+    // 2. 長度獎勵
+    if (prompt.length > 100) score += 0.2;
+    if (prompt.length > 200) score += 0.3;
+    if (prompt.length > 300) score += 0.2;
+    
+    // 3. 逗號數量 (描述細節多)
+    const commaCount = (prompt.match(/,/g) || []).length;
+    if (commaCount > 5) score += 0.15;
+    if (commaCount > 10) score += 0.15;
+    
+    // 4. 括號使用 (權重控制)
+    const hasParentheses = /\(|\)/.test(prompt);
+    if (hasParentheses) score += 0.1;
+    
+    // 限制在 0-1 範圍
+    return Math.min(score, 1.0);
+  }
+  
+  /**
+   * 推薦質量模式
+   * @param {string} prompt - 提示詞
+   * @param {string} model - 模型ID
+   * @returns {string} - 推薦的質量模式
+   */
+  static recommendQualityMode(prompt, model) {
+    const complexity = this.analyzeComplexity(prompt);
+    
+    // Nano Banana Pro 強制 4K
+    if (model === 'nanobanana-pro') {
+      return 'ultra_4k';
     }
     
-    if (results.length === 0) {
-      throw new Error('All batch generations failed');
+    // 快速模型建議經濟模式
+    if (['turbo', 'sdxl-lightning', 'sd3.5-turbo'].includes(model)) {
+      return 'economy';
     }
     
-    return jsonResponse({ success: true, data: results });
-  } catch (error) {
-    console.error('Batch error:', error);
-    return jsonResponse({ success: false, error: error.message }, 500);
+    // 根據複雜度推薦
+    if (complexity > 0.7) return 'ultra';
+    if (complexity > 0.4) return 'standard';
+    return 'economy';
   }
 }
 
-// 提示詞優化 (使用 Pollinations Text API)
-async function handleOptimizePrompt(request, env) {
-  try {
-    const { prompt } = await request.json();
-    
-    if (!prompt || prompt.trim() === '') {
-      return jsonResponse({ success: false, error: 'Prompt is required' }, 400);
+/**
+ * HD 優化器
+ * 根據質量模式自動優化提示詞和參數
+ */
+class HDOptimizer {
+  /**
+   * 執行 HD 優化
+   * @param {string} prompt - 原始提示詞
+   * @param {string} negativePrompt - 負面提示詞
+   * @param {string} model - 模型ID
+   * @param {number} width - 寬度
+   * @param {number} height - 高度
+   * @param {string} qualityMode - 質量模式
+   * @param {boolean} autoHD - 是否啟用自動HD
+   * @returns {Object} - 優化後的參數
+   */
+  static optimize(prompt, negativePrompt, model, width, height, qualityMode = 'standard', autoHD = true) {
+    if (!autoHD || !CONFIG.HD_OPTIMIZATION.enabled) {
+      return {
+        prompt,
+        negativePrompt,
+        width,
+        height,
+        optimized: false
+      };
     }
     
-    const optimizationPrompt = `Optimize this image generation prompt for better AI art results. Return ONLY the improved prompt without explanations: "${prompt}"`;
-    const encodedPrompt = encodeURIComponent(optimizationPrompt);
+    const modeConfig = CONFIG.HD_OPTIMIZATION.QUALITY_MODES[qualityMode];
+    if (!modeConfig) {
+      console.warn('[HDOptimizer] Invalid quality mode:', qualityMode);
+      return { prompt, negativePrompt, width, height, optimized: false };
+    }
     
-    const response = await fetch(
-      `https://text.pollinations.ai/${encodedPrompt}?model=openai`,
-      {
-        headers: { 'User-Agent': 'Pollinations-AI-Pro/1.0' }
+    const profile = CONFIG.HD_OPTIMIZATION.MODEL_QUALITY_PROFILES[model];
+    const optimizations = [];
+    
+    // 1. 增強提示詞 (添加 HD 關鍵詞)
+    let enhancedPrompt = prompt;
+    const hdLevel = modeConfig.hd_level;
+    const hdBoost = CONFIG.HD_OPTIMIZATION.HD_PROMPTS[hdLevel];
+    
+    if (hdBoost && !prompt.toLowerCase().includes('quality')) {
+      enhancedPrompt = prompt + ", " + hdBoost;
+      optimizations.push(`HD增強: ${hdLevel}`);
+    }
+    
+    // 2. 增強負面提示詞
+    let enhancedNegative = negativePrompt || "";
+    if (qualityMode !== 'economy') {
+      const hdNegative = CONFIG.HD_OPTIMIZATION.HD_NEGATIVE;
+      if (!enhancedNegative.toLowerCase().includes('low quality')) {
+        enhancedNegative = enhancedNegative ? 
+          (enhancedNegative + ", " + hdNegative) : 
+          hdNegative;
+        optimizations.push("負面詞增強");
       }
+    }
+    
+    // 3. 智能尺寸優化
+    let finalWidth = width;
+    let finalHeight = height;
+    const currentRes = Math.min(width, height);
+    const minRes = Math.max(modeConfig.min_resolution, profile?.min_resolution || 1024);
+    
+    // 檢查是否需要上採樣
+    if (currentRes < minRes || modeConfig.force_upscale) {
+      const scale = minRes / currentRes;
+      
+      // 確保是 64 的倍數（Stable Diffusion 要求）
+      finalWidth = Math.min(Math.round(width * scale / 64) * 64, modeConfig.max_resolution);
+      finalHeight = Math.min(Math.round(height * scale / 64) * 64, modeConfig.max_resolution);
+      
+      optimizations.push(`尺寸優化: ${width}x${height} → ${finalWidth}x${finalHeight}`);
+    }
+    
+    // 4. 模型專屬優化
+    if (profile) {
+      // 檢查最大分辨率限制
+      if (profile.max_resolution) {
+        finalWidth = Math.min(finalWidth, profile.max_resolution);
+        finalHeight = Math.min(finalHeight, profile.max_resolution);
+      }
+      
+      optimizations.push(`模型配置: ${profile.priority}`);
+    }
+    
+    return {
+      prompt: enhancedPrompt,
+      negativePrompt: enhancedNegative,
+      width: finalWidth,
+      height: finalHeight,
+      optimized: true,
+      qualityMode: qualityMode,
+      hdLevel: hdLevel,
+      optimizations: optimizations
+    };
+  }
+}
+
+/**
+ * 參數優化器
+ * 智能計算最佳步數和引導係數
+ */
+class ParameterOptimizer {
+  /**
+   * 優化步數
+   * @param {string} model - 模型ID
+   * @param {number} width - 寬度
+   * @param {number} height - 高度
+   * @param {string} style - 風格
+   * @param {string} qualityMode - 質量模式
+   * @param {number} userSteps - 用戶指定步數
+   * @returns {Object} - { steps: number, reasoning: string }
+   */
+  static optimizeSteps(model, width, height, style, qualityMode, userSteps = null) {
+    // 如果用戶指定了步數，直接使用
+    if (userSteps !== null && userSteps > 0) {
+      return { 
+        steps: userSteps, 
+        reasoning: "用戶指定步數",
+        source: "user"
+      };
+    }
+    
+    // 1. 獲取模型基礎步數
+    const modelRule = CONFIG.OPTIMIZATION_RULES.MODEL_STEPS[model];
+    if (!modelRule) {
+      console.warn('[ParameterOptimizer] Unknown model, using default steps');
+      return { steps: 20, reasoning: "默認步數", source: "default" };
+    }
+    
+    let baseSteps = modelRule.optimal;
+    const reasoning = [];
+    
+    // 2. 尺寸調整
+    const totalPixels = width * height;
+    let sizeMultiplier = 1.0;
+    
+    if (totalPixels >= 4096 * 4096) {
+      sizeMultiplier = CONFIG.OPTIMIZATION_RULES.SIZE_MULTIPLIER.ultra_4k.multiplier;
+      reasoning.push("4K超清");
+    } else if (totalPixels >= 2048 * 2048) {
+      sizeMultiplier = CONFIG.OPTIMIZATION_RULES.SIZE_MULTIPLIER.xlarge.multiplier;
+      reasoning.push("2K大圖");
+    } else if (totalPixels >= 1536 * 1536) {
+      sizeMultiplier = CONFIG.OPTIMIZATION_RULES.SIZE_MULTIPLIER.large.multiplier;
+      reasoning.push("1.5K高清");
+    } else if (totalPixels >= 1024 * 1024) {
+      sizeMultiplier = CONFIG.OPTIMIZATION_RULES.SIZE_MULTIPLIER.medium.multiplier;
+      reasoning.push("1K標準");
+    } else {
+      sizeMultiplier = CONFIG.OPTIMIZATION_RULES.SIZE_MULTIPLIER.small.multiplier;
+      reasoning.push("小圖快速");
+    }
+    
+    // 3. 風格調整
+    const styleMultiplier = CONFIG.OPTIMIZATION_RULES.STYLE_ADJUSTMENT[style] || 
+                           CONFIG.OPTIMIZATION_RULES.STYLE_ADJUSTMENT.default;
+    if (styleMultiplier !== 1.0) {
+      reasoning.push(`風格: ${style}`);
+    }
+    
+    // 4. 質量模式調整
+    const modeConfig = CONFIG.HD_OPTIMIZATION.QUALITY_MODES[qualityMode];
+    const qualityMultiplier = modeConfig?.steps_multiplier || 1.0;
+    if (qualityMultiplier !== 1.0) {
+      reasoning.push(`質量: ${qualityMode}`);
+    }
+    
+    // 5. 模型配置加成
+    const profile = CONFIG.HD_OPTIMIZATION.MODEL_QUALITY_PROFILES[model];
+    const profileBoost = profile?.optimal_steps_boost || 1.0;
+    if (profileBoost !== 1.0) {
+      reasoning.push(`模型配置加成`);
+    }
+    
+    // 6. 計算最終步數
+    let finalSteps = Math.round(
+      baseSteps * sizeMultiplier * styleMultiplier * qualityMultiplier * profileBoost
     );
     
-    if (!response.ok) {
-      throw new Error('Optimization failed');
-    }
+    // 7. 限制在合理範圍
+    finalSteps = Math.max(modelRule.min, Math.min(finalSteps, modelRule.max));
     
-    const optimizedPrompt = await response.text();
-    
-    return jsonResponse({
-      success: true,
-      data: { 
-        originalPrompt: prompt,
-        optimizedPrompt: optimizedPrompt.trim().replace(/^["']|["']$/g, '')
+    return {
+      steps: finalSteps,
+      reasoning: `${model}: ${baseSteps}步 × ${reasoning.join(' × ')} → ${finalSteps}步`,
+      source: "optimized",
+      factors: {
+        base: baseSteps,
+        size: sizeMultiplier,
+        style: styleMultiplier,
+        quality: qualityMultiplier,
+        profile: profileBoost
       }
-    });
-  } catch (error) {
-    console.error('Optimize error:', error);
-    return jsonResponse({ 
-      success: false, 
-      error: 'Prompt optimization failed' 
-    }, 500);
-  }
-}
-// 獲取風格預設
-async function handleGetStyles(request, env) {
-  return jsonResponse({
-    success: true,
-    data: getStylePresets()
-  });
-}
-
-// 獲取歷史記錄
-async function handleHistory(request, env) {
-  try {
-    const historyJson = await env.IMAGE_HISTORY?.get('records') || '[]';
-    const history = JSON.parse(historyJson);
-    
-    // 按時間倒序排列
-    history.sort((a, b) => b.timestamp - a.timestamp);
-    
-    return jsonResponse(history);
-  } catch (error) {
-    console.error('History fetch error:', error);
-    return jsonResponse([]);
-  }
-}
-
-// 刪除歷史記錄
-async function handleDeleteHistory(request, env) {
-  try {
-    const { id } = await request.json();
-    
-    if (!id) {
-      return jsonResponse({ success: false, error: 'ID is required' }, 400);
-    }
-    
-    const historyJson = await env.IMAGE_HISTORY?.get('records') || '[]';
-    const history = JSON.parse(historyJson);
-    const filtered = history.filter(item => item.id !== id);
-    
-    await env.IMAGE_HISTORY?.put('records', JSON.stringify(filtered));
-    
-    return jsonResponse({ 
-      success: true, 
-      message: 'Record deleted successfully' 
-    });
-  } catch (error) {
-    console.error('Delete error:', error);
-    return jsonResponse({ success: false, error: error.message }, 500);
-  }
-}
-// 保存到歷史記錄
-async function saveToHistory(env, record) {
-  if (!env.IMAGE_HISTORY) {
-    console.warn('KV namespace not configured');
-    return;
+    };
   }
   
-  try {
-    const historyJson = await env.IMAGE_HISTORY.get('records') || '[]';
-    const history = JSON.parse(historyJson);
+  /**
+   * 優化引導係數 (Guidance Scale)
+   * @param {string} model - 模型ID
+   * @param {string} style - 風格
+   * @param {string} qualityMode - 質量模式
+   * @returns {number} - 引導係數
+   */
+  static optimizeGuidance(model, style, qualityMode) {
+    // 基礎引導係數
+    let guidance = 7.5;
     
-    // 添加新記錄到開頭
-    history.unshift(record);
-    
-    // 保留最近 100 條記錄
-    if (history.length > 100) {
-      history.splice(100);
+    // 質量模式調整
+    const modeConfig = CONFIG.HD_OPTIMIZATION.QUALITY_MODES[qualityMode];
+    if (modeConfig?.guidance_multiplier) {
+      guidance *= modeConfig.guidance_multiplier;
     }
     
-    await env.IMAGE_HISTORY.put('records', JSON.stringify(history));
-  } catch (error) {
-    console.error('Save to history error:', error);
+    // 模型配置調整
+    const profile = CONFIG.HD_OPTIMIZATION.MODEL_QUALITY_PROFILES[model];
+    if (profile?.guidance_boost) {
+      guidance *= profile.guidance_boost;
+    }
+    
+    // 風格調整
+    if (style === 'photorealistic' || style === 'cinematic') {
+      guidance *= 1.1;
+    } else if (style === 'sketch' || style === 'watercolor') {
+      guidance *= 0.9;
+    }
+    
+    // 限制在合理範圍 (3-15)
+    return Math.max(3, Math.min(guidance, 15));
+  }
+  
+  /**
+   * 計算最優步數（新方法，向後兼容）
+   * @deprecated 使用 optimizeSteps 代替
+   */
+  static calculateOptimalSteps(model, width, height, style, qualityMode) {
+    return this.optimizeSteps(model, width, height, style, qualityMode, null).steps;
   }
 }
 
-// ArrayBuffer 轉 Base64
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunkSize = 0x8000; // 32KB chunks
-  
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode.apply(null, chunk);
-  }
-  
-  return `data:image/png;base64,${btoa(binary)}`;
-}
-
-// JSON 響應
-function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache'
-    }
-  });
-}
-
-// 風格預設配置
-function getStylePresets() {
-  return [
-    { id: 'none', name: '無風格', suffix: '' },
-    { id: 'anime', name: '動漫風格', suffix: 'anime style, vibrant colors, detailed illustration' },
-    { id: 'realistic', name: '寫實攝影', suffix: 'photorealistic, 8k uhd, detailed, professional photography' },
-    { id: 'cyberpunk', name: '賽博朋克', suffix: 'cyberpunk style, neon lights, futuristic, dark atmosphere' },
-    { id: 'fantasy', name: '奇幻藝術', suffix: 'fantasy art, magical, epic, detailed concept art' },
-    { id: 'oil', name: '油畫', suffix: 'oil painting style, classical art, brush strokes' },
-    { id: 'watercolor', name: '水彩畫', suffix: 'watercolor painting, soft colors, artistic' },
-    { id: '3d', name: '3D 渲染', suffix: '3d render, octane render, high quality, detailed' },
-    { id: 'pixel', name: '像素藝術', suffix: 'pixel art style, retro, 8-bit, detailed pixels' },
-    { id: 'sketch', name: '素描', suffix: 'pencil sketch, hand-drawn, artistic sketch' },
-    { id: 'minimalist', name: '極簡主義', suffix: 'minimalist design, simple, clean, modern' },
-    { id: 'vintage', name: '復古風格', suffix: 'vintage style, retro, classic, aged' },
-    { id: 'cartoon', name: '卡通風格', suffix: 'cartoon style, colorful, fun, illustrated' },
-    { id: 'gothic', name: '哥德風格', suffix: 'gothic style, dark, dramatic, Victorian' },
-    { id: 'pop', name: '普普藝術', suffix: 'pop art style, bold colors, Andy Warhol style' },
-    { id: 'surreal', name: '超現實', suffix: 'surrealism, dreamlike, Salvador Dali style' },
-    { id: 'steampunk', name: '蒸汽龐克', suffix: 'steampunk style, Victorian era, mechanical, brass and copper' },
-    { id: 'comic', name: '漫畫風格', suffix: 'comic book style, bold lines, halftone dots' },
-    { id: 'impressionist', name: '印象派', suffix: 'impressionist painting, Monet style, soft brush strokes' },
-    { id: 'neon', name: '霓虹美學', suffix: 'neon aesthetic, glowing, vibrant colors, futuristic' }
-  ];
-}
-// HTML 前端生成函數
-function getHTML() {
-  return `<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Studio - 專業圖像生成器</title>
-  <meta name="description" content="基於 Pollinations AI 的專業級圖像生成平台,支持文生圖、圖生圖、局部重繪和批次生成">
-  <meta name="keywords" content="AI,圖像生成,Pollinations,FLUX,Stable Diffusion">
-  <style>
-    /* CSS 變量定義 */
-    :root {
-      --bg-primary: #0a0e27;
-      --bg-secondary: #1a1f3a;
-      --bg-glass: rgba(255, 255, 255, 0.05);
-      --border-glass: rgba(255, 255, 255, 0.1);
-      --text-primary: #ffffff;
-      --text-secondary: #a0aec0;
-      --accent-primary: #667eea;
-      --accent-secondary: #764ba2;
-      --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-    }
-    
-    /* 亮色主題 */
-    [data-theme="light"] {
-      --bg-primary: #f7fafc;
-      --bg-secondary: #ffffff;
-      --bg-glass: rgba(255, 255, 255, 0.75);
-      --border-glass: rgba(255, 255, 255, 0.3);
-      --text-primary: #1a202c;
-      --text-secondary: #4a5568;
-      --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-    }
-    
-    /* 基礎重置 */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-      color: var(--text-primary);
-      min-height: 100vh;
-      transition: background 0.3s ease;
-    }
-    
-    /* 毛玻璃效果 */
-    .glass {
-      background: var(--bg-glass);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid var(--border-glass);
-      border-radius: 16px;
-      box-shadow: var(--shadow-glass);
-    }
-    
-    /* 導航欄 */
-    .navbar {
-      padding: 20px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      backdrop-filter: blur(20px);
-      background: rgba(10, 14, 39, 0.8);
-      border-bottom: 1px solid var(--border-glass);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-    }
-    
-    .logo {
-      font-size: 24px;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .nav-actions {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-    
-    .theme-toggle {
-      background: var(--bg-glass);
-      border: 1px solid var(--border-glass);
-      color: var(--text-primary);
-      padding: 10px 15px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-      backdrop-filter: blur(10px);
-      font-size: 14px;
-    }
-    
-    .theme-toggle:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-    
-    /* 主容器 */
-    .container {
-      display: grid;
-      grid-template-columns: 80px 400px 1fr 350px;
-      gap: 20px;
-      padding: 20px;
-      max-width: 1920px;
-      margin: 0 auto;
-      height: calc(100vh - 80px);
-    }
-    
-    /* 左側工具欄 */
-    .toolbar {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-    
-    .tool-btn {
-      background: var(--bg-glass);
-      border: 1px solid var(--border-glass);
-      color: var(--text-primary);
-      width: 60px;
-      height: 60px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.3s;
-      backdrop-filter: blur(10px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      position: relative;
-    }
-    
-    .tool-btn:hover,
-    .tool-btn.active {
-      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-      transform: translateX(5px);
-      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-    }
-    
-    .tool-btn .tooltip {
-      position: absolute;
-      left: 75px;
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s;
-    }
-    
-    .tool-btn:hover .tooltip {
-      opacity: 1;
-    }
-    
-    /* 控制面板 */
-    .control-panel {
-      overflow-y: auto;
-      padding: 25px;
-    }
-    
-    .panel-section {
-      margin-bottom: 25px;
-    }
-    
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 15px;
-    }
-    
-    .input-group {
-      margin-bottom: 20px;
-    }
-    
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-    
-    input,
-    select,
-    textarea {
-      width: 100%;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-glass);
-      border-radius: 8px;
-      color: var(--text-primary);
-      font-size: 14px;
-      transition: all 0.3s;
-      font-family: inherit;
-    }
-    
-    input:focus,
-    select:focus,
-    textarea:focus {
-      outline: none;
-      border-color: var(--accent-primary);
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-    
-    textarea {
-      resize: vertical;
-      min-height: 100px;
-      line-height: 1.6;
-    }
-    
-    /* 按鈕樣式 */
-    .btn {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.5s;
-    }
-    
-    .btn:hover::before {
-      left: 100%;
-    }
-    
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-    }
-    
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-    
-    .btn-secondary {
-      background: var(--bg-glass);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-glass);
-      color: var(--text-primary);
-    }
-    
-    .btn-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    
-    /* 參數網格 */
-    .param-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-    }
-    
-    /* 範圍滑桿 */
-    input[type="range"] {
-      padding: 0;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-    }
-    
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      background: var(--accent-primary);
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    }
-    
-    input[type="range"]::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      background: var(--accent-primary);
-      border-radius: 50%;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    }
-    
-    .range-value {
-      float: right;
-      font-size: 12px;
-      color: var(--accent-primary);
-      font-weight: 600;
-    }
-  </style>
-</head>`;
-}
-// 接續 getHTML() 函數內的 <style> 標籤
-function getHTMLStyles2() {
-  return `
-    /* 中央預覽區 */
-    .preview-area {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      overflow: hidden;
-    }
-    
-    .preview-container {
-      flex: 1;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-      min-height: 400px;
-    }
-    
-    .preview-container img {
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      object-fit: contain;
-    }
-    
-    .preview-placeholder {
-      text-align: center;
-      color: var(--text-secondary);
-      padding: 40px;
-    }
-    
-    .preview-placeholder svg {
-      width: 120px;
-      height: 120px;
-      opacity: 0.3;
-      margin-bottom: 20px;
-    }
-    
-    /* Canvas 編輯器 */
-    #inpaintCanvas {
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 12px;
-      cursor: crosshair;
-      display: none;
-    }
-    
-    .canvas-controls {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      display: none;
-      gap: 10px;
-    }
-    
-    .canvas-btn {
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(10px);
-      color: white;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 10px 15px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.3s;
-    }
-    
-    .canvas-btn:hover {
-      background: rgba(102, 126, 234, 0.8);
-    }
-    
-    /* 操作按鈕組 */
-    .action-bar {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .action-btn {
-      flex: 1;
-      padding: 12px;
-      background: var(--bg-glass);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-glass);
-      color: var(--text-primary);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-size: 13px;
-      font-weight: 500;
-    }
-    
-    .action-btn:hover {
-      background: rgba(102, 126, 234, 0.2);
-      border-color: var(--accent-primary);
-    }
-    
-    /* 右側參數面板 */
-    .params-panel {
-      overflow-y: auto;
-      padding: 25px;
-    }
-    
-    /* 風格預設網格 */
-    .style-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    
-    .style-card {
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 2px solid transparent;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-align: center;
-      font-size: 12px;
-    }
-    
-    .style-card:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: var(--accent-primary);
-    }
-    
-    .style-card.active {
-      background: rgba(102, 126, 234, 0.2);
-      border-color: var(--accent-primary);
-    }
-    
-    /* 歷史記錄區域 */
-    .history-section {
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border-glass);
-    }
-    
-    .history-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    
-    .history-item {
-      position: relative;
-      aspect-ratio: 1;
-      border-radius: 8px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: transform 0.3s;
-    }
-    
-    .history-item:hover {
-      transform: scale(1.05);
-      z-index: 10;
-    }
-    
-    .history-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .history-item .overlay {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-      padding: 10px;
-      transform: translateY(100%);
-      transition: transform 0.3s;
-    }
-    
-    .history-item:hover .overlay {
-      transform: translateY(0);
-    }
-    
-    .history-item .overlay p {
-      font-size: 11px;
-      color: white;
-      margin: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    
-    .delete-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(255, 59, 48, 0.9);
-      color: white;
-      border: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .history-item:hover .delete-btn {
-      opacity: 1;
-    }
-    
-    /* 載入動畫 */
-    .loading {
-      text-align: center;
-      padding: 40px;
-    }
-    
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid rgba(255, 255, 255, 0.1);
-      border-top-color: var(--accent-primary);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    /* 狀態訊息 */
-    .status {
-      margin-top: 15px;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      text-align: center;
-      backdrop-filter: blur(10px);
-    }
-    
-    .status.success {
-      background: rgba(52, 211, 153, 0.1);
-      border: 1px solid rgba(52, 211, 153, 0.3);
-      color: #34d399;
-    }
-    
-    .status.error {
-      background: rgba(248, 113, 113, 0.1);
-      border: 1px solid rgba(248, 113, 113, 0.3);
-      color: #f87171;
-    }
-    
-    .status.info {
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: #3b82f6;
-    }
-    
-    /* 批次生成網格 */
-    .batch-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 15px;
-      margin-top: 20px;
-    }
-    
-    .batch-item {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 10px;
-    }
-    
-    .batch-item img {
-      width: 100%;
-      border-radius: 8px;
-    }
-    
-    .batch-item .seed-label {
-      text-align: center;
-      margin-top: 8px;
-      font-size: 11px;
-      color: var(--text-secondary);
-    }
-    
-    /* 捲軸樣式 */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-  `;
-}
-// 接續 CSS 樣式
-function getHTMLStyles3() {
-  return `
-    /* 響應式設計 */
-    @media (max-width: 1400px) {
-      .container {
-        grid-template-columns: 400px 1fr 300px;
-      }
-      .toolbar {
-        display: none;
-      }
-    }
-    
-    @media (max-width: 1024px) {
-      .container {
-        grid-template-columns: 1fr;
-        height: auto;
-      }
-      .params-panel {
-        display: none;
-      }
-      .control-panel {
-        max-height: none;
-      }
-    }
-    
-    @media (max-width: 768px) {
-      .navbar {
-        padding: 15px 20px;
-      }
-      .logo {
-        font-size: 20px;
-      }
-      .nav-actions {
-        gap: 10px;
-      }
-      .theme-toggle {
-        padding: 8px 12px;
-        font-size: 12px;
-      }
-      .container {
-        padding: 15px;
-        gap: 15px;
-      }
-      .param-grid {
-        grid-template-columns: 1fr;
-      }
-      .btn-group {
-        grid-template-columns: 1fr;
-      }
-      .action-bar {
-        flex-direction: column;
-      }
-    }
-  </style>
-</head>
-
-<body data-theme="dark">
-  <!-- 導航欄 -->
-  <div class="navbar">
-    <div class="logo">
-      <span>🎨</span>
-      <span>AI Studio</span>
-    </div>
-    <div class="nav-actions">
-      <button class="theme-toggle" onclick="toggleTheme()">
-        <span id="themeIcon">🌙</span> 主題
-      </button>
-      <button class="theme-toggle" onclick="loadHistory()">
-        📚 歷史
-      </button>
-    </div>
-  </div>
-
-  <!-- 主容器 -->
-  <div class="container">
-    <!-- 左側工具欄 -->
-    <div class="toolbar">
-      <button class="tool-btn active" data-tool="text2img" onclick="switchTool('text2img')">
-        ✨
-        <span class="tooltip">文生圖</span>
-      </button>
-      <button class="tool-btn" data-tool="img2img" onclick="switchTool('img2img')">
-        🖼️
-        <span class="tooltip">圖生圖</span>
-      </button>
-      <button class="tool-btn" data-tool="inpaint" onclick="switchTool('inpaint')">
-        🎨
-        <span class="tooltip">局部重繪</span>
-      </button>
-      <button class="tool-btn" data-tool="batch" onclick="switchTool('batch')">
-        📦
-        <span class="tooltip">批次生成</span>
-      </button>
-    </div>
-  `;
-}
-// 接續 HTML Body
-function getHTMLBody2() {
-  return `
-    <!-- 中央預覽區 -->
-    <div class="preview-area">
-      <div class="glass preview-container" id="previewContainer">
-        <div class="preview-placeholder" id="placeholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          <p>在左側輸入提示詞並點擊生成</p>
-          <p style="font-size: 12px; margin-top: 10px; opacity: 0.7;">支持文生圖、圖生圖、局部重繪和批次生成</p>
-        </div>
-        
-        <!-- Canvas for Inpainting -->
-        <canvas id="inpaintCanvas"></canvas>
-        
-        <!-- Canvas 控制按鈕 -->
-        <div class="canvas-controls" id="canvasControls">
-          <button class="canvas-btn" onclick="clearMask()">🗑️ 清除遮罩</button>
-          <button class="canvas-btn" onclick="adjustBrushSize(-5)">➖ 筆刷</button>
-          <button class="canvas-btn" onclick="adjustBrushSize(5)">➕ 筆刷</button>
-        </div>
-      </div>
-      
-      <!-- 操作按鈕欄 -->
-      <div class="action-bar">
-        <button class="action-btn" onclick="downloadImage()">💾 下載</button>
-        <button class="action-btn" onclick="copyPrompt()">📋 複製提示詞</button>
-        <button class="action-btn" onclick="shareImage()">🔗 分享</button>
-      </div>
-    </div>
-  `;
-}
-// 接續 HTML Body
-function getHTMLBody3() {
-  return `
-    <!-- 右側參數面板 -->
-    <div class="glass params-panel">
-      <div class="panel-section">
-        <div class="section-title">風格預設</div>
-        <div class="style-grid" id="styleGrid">
-          <!-- 動態載入風格卡片 -->
-        </div>
-      </div>
-
-      <div class="history-section">
-        <div class="section-title">
-          最近生成
-          <button class="btn-secondary" onclick="loadHistory()" style="float: right; padding: 6px 12px; font-size: 12px; width: auto;">🔄</button>
-        </div>
-        <div class="history-grid" id="historyGrid">
-          <!-- 動態載入歷史記錄 -->
-        </div>
-      </div>
-    </div>
-  </div>
-  `;
-}
-// 接續 HTML - JavaScript 部分開始
-function getHTMLScript1() {
-  return `
-  <script>
-    // 全局變量
-    let currentTool = 'text2img';
-    let currentRecord = null;
-    let selectedStyle = 'none';
-    let referenceImageData = null;
-    let canvas, ctx;
-    let isDrawing = false;
-    let brushSize = 30;
-
-    // 頁面載入時初始化
-    window.addEventListener('DOMContentLoaded', () => {
-      loadStyles();
-      loadHistory();
-      initCanvas();
-      loadThemePreference();
-    });
-
-    // 主題切換
-    function toggleTheme() {
-      const body = document.body;
-      const currentTheme = body.getAttribute('data-theme');
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      body.setAttribute('data-theme', newTheme);
-      document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '🌙' : '☀️';
-      localStorage.setItem('theme', newTheme);
-    }
-
-    function loadThemePreference() {
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      document.body.setAttribute('data-theme', savedTheme);
-      document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-    }
-
-    // 工具切換
-    function switchTool(tool) {
-      currentTool = tool;
-      
-      // 更新按鈕狀態
-      document.querySelectorAll('.tool-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-tool') === tool);
-      });
-
-      // 顯示/隱藏相關面板
-      document.getElementById('img2imgSection').style.display = tool === 'img2img' ? 'block' : 'none';
-      document.getElementById('batchSection').style.display = tool === 'batch' ? 'block' : 'none';
-      
-      // Canvas 相關
-      const canvas = document.getElementById('inpaintCanvas');
-      const controls = document.getElementById('canvasControls');
-      const placeholder = document.getElementById('placeholder');
-      
-      if (tool === 'inpaint') {
-        canvas.style.display = 'block';
-        controls.style.display = 'flex';
-        if (placeholder) placeholder.style.display = 'none';
-      } else {
-        canvas.style.display = 'none';
-        controls.style.display = 'none';
-        if (!currentRecord && placeholder) placeholder.style.display = 'flex';
-      }
-    }
-
-    // 載入風格預設
-    async function loadStyles() {
-      try {
-        const response = await fetch('/api/styles');
-        const result = await response.json();
-        const grid = document.getElementById('styleGrid');
-        
-        if (result.success && result.data) {
-          grid.innerHTML = result.data.map(style => \`
-            <div class="style-card \${style.id === selectedStyle ? 'active' : ''}" 
-                 onclick="selectStyle('\${style.id}')">
-              \${style.name}
-            </div>
-          \`).join('');
-        }
-      } catch (error) {
-        console.error('載入風格失敗:', error);
-      }
-    }
-
-    function selectStyle(styleId) {
-      selectedStyle = styleId;
-      document.querySelectorAll('.style-card').forEach(card => {
-        card.classList.remove('active');
-      });
-      event.target.classList.add('active');
-    }
-  `;
-}
-// 接續 JavaScript
-function getHTMLScript2() {
-  return `
-    // 主生成函數
-    async function generate() {
-      const prompt = document.getElementById('prompt').value.trim();
-      if (!prompt) {
-        showStatus('請輸入提示詞', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('generateBtn');
-      const originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '⏳ 生成中...';
-      showStatus('正在生成圖片,請稍候...', 'info');
-
-      try {
-        let result;
-        
-        if (currentTool === 'text2img') {
-          result = await generateText2Img();
-        } else if (currentTool === 'img2img') {
-          result = await generateImg2Img();
-        } else if (currentTool === 'inpaint') {
-          result = await generateInpaint();
-        } else if (currentTool === 'batch') {
-          result = await generateBatch();
-          if (result.success) {
-            displayBatchResults(result.data);
-            showStatus(\`✅ 成功生成 \${result.data.length} 張圖片!\`, 'success');
-          }
-          return;
-        }
-
-        if (result && result.success) {
-          currentRecord = result.data;
-          displayImage(result.data);
-          loadHistory();
-          showStatus('✅ 生成成功!', 'success');
-        } else {
-          showStatus('❌ 生成失敗: ' + (result?.error || '未知錯誤'), 'error');
-        }
-      } catch (error) {
-        console.error('生成錯誤:', error);
-        showStatus('❌ 生成失敗: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    }
-
-    // 文生圖
-    async function generateText2Img() {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: document.getElementById('prompt').value,
-          negativePrompt: document.getElementById('negativePrompt').value,
-          model: document.getElementById('model').value,
-          width: parseInt(document.getElementById('width').value),
-          height: parseInt(document.getElementById('height').value),
-          seed: document.getElementById('seed').value || undefined,
-          style: selectedStyle
-        })
-      });
-      return response.json();
-    }
-
-    // 圖生圖
-    async function generateImg2Img() {
-      if (!referenceImageData) {
-        showStatus('請先上傳參考圖片', 'error');
-        throw new Error('No reference image');
-      }
-
-      const response = await fetch('/api/img2img', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: document.getElementById('prompt').value,
-          referenceImage: referenceImageData,
-          strength: parseFloat(document.getElementById('strength').value),
-          model: document.getElementById('model').value,
-          width: parseInt(document.getElementById('width').value),
-          height: parseInt(document.getElementById('height').value),
-          seed: document.getElementById('seed').value || undefined
-        })
-      });
-      return response.json();
-    }
-
-    // 局部重繪
-    async function generateInpaint() {
-      const maskData = canvas.toDataURL();
-      
-      const response = await fetch('/api/inpaint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: document.getElementById('prompt').value,
-          sourceImage: currentRecord?.image,
-          maskImage: maskData,
-          model: document.getElementById('model').value,
-          width: parseInt(document.getElementById('width').value),
-          height: parseInt(document.getElementById('height').value)
-        })
-      });
-      return response.json();
-    }
-
-    // 批次生成
-    async function generateBatch() {
-      const response = await fetch('/api/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: document.getElementById('prompt').value,
-          count: parseInt(document.getElementById('batchCount').value),
-          model: document.getElementById('model').value,
-          width: parseInt(document.getElementById('width').value),
-          height: parseInt(document.getElementById('height').value),
-          baseSeed: document.getElementById('seed').value || undefined
-        })
-      });
-      return response.json();
-    }
-  `;
-}
-// 接續 JavaScript
-function getHTMLScript3() {
-  return `
-    // 提示詞優化
-    async function optimizePrompt() {
-      const prompt = document.getElementById('prompt').value.trim();
-      if (!prompt) {
-        showStatus('請先輸入提示詞', 'error');
-        return;
-      }
-
-      showStatus('正在優化提示詞...', 'info');
-      try {
-        const response = await fetch('/api/optimize-prompt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
-        });
-        const result = await response.json();
-        
-        if (result.success) {
-          document.getElementById('prompt').value = result.data.optimizedPrompt;
-          showStatus('✅ 提示詞已優化!', 'success');
-        } else {
-          showStatus('優化失敗', 'error');
-        }
-      } catch (error) {
-        console.error('優化錯誤:', error);
-        showStatus('優化失敗', 'error');
-      }
-    }
-
-    // 顯示單張圖片
-    function displayImage(data) {
-      const container = document.getElementById('previewContainer');
-      const placeholder = document.getElementById('placeholder');
-      
-      if (placeholder) placeholder.style.display = 'none';
-      
-      container.innerHTML = \`
-        <img src="\${data.image}" alt="\${data.prompt}" onload="this.style.opacity=1" style="opacity:0; transition: opacity 0.3s;">
-      \`;
-    }
-
-    // 顯示批次結果
-    function displayBatchResults(results) {
-      const container = document.getElementById('previewContainer');
-      const placeholder = document.getElementById('placeholder');
-      
-      if (placeholder) placeholder.style.display = 'none';
-      
-      container.innerHTML = \`
-        <div class="batch-grid">
-          \${results.map(item => \`
-            <div class="batch-item" onclick='displayImage(\${JSON.stringify(item).replace(/'/g, "&#39;")})'>
-              <img src="\${item.image}" alt="Seed: \${item.seed}">
-              <div class="seed-label">Seed: \${item.seed}</div>
-            </div>
-          \`).join('')}
-        </div>
-      \`;
-    }
-
-    // 參考圖片處理
-    function handleReferenceImage(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (!file.type.startsWith('image/')) {
-        showStatus('請上傳圖片文件', 'error');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        referenceImageData = e.target.result;
-        document.getElementById('referencePreview').innerHTML = \`
-          <img src="\${e.target.result}" style="max-width: 100%; border-radius: 8px; margin-top: 10px;">
-          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">已上傳參考圖片</p>
-        \`;
-        showStatus('✅ 參考圖片已上傳', 'success');
+/**
+ * 風格處理器
+ * 應用藝術風格預設
+ */
+class StyleProcessor {
+  /**
+   * 應用風格
+   * @param {string} prompt - 原始提示詞
+   * @param {string} style - 風格ID
+   * @param {string} negativePrompt - 負面提示詞
+   * @returns {Object} - { enhancedPrompt: string, enhancedNegative: string }
+   */
+  static applyStyle(prompt, style, negativePrompt) {
+    // 無風格或不存在的風格
+    if (!style || style === 'none' || !CONFIG.STYLE_PRESETS[style]) {
+      return { 
+        enhancedPrompt: prompt, 
+        enhancedNegative: negativePrompt 
       };
-      reader.readAsDataURL(file);
     }
-  `;
+    
+    const styleConfig = CONFIG.STYLE_PRESETS[style];
+    
+    // 1. 增強正面提示詞
+    let enhancedPrompt = prompt;
+    if (styleConfig.prompt) {
+      // 避免重複添加
+      const lowerPrompt = prompt.toLowerCase();
+      const lowerStylePrompt = styleConfig.prompt.toLowerCase();
+      
+      if (!lowerPrompt.includes(lowerStylePrompt)) {
+        enhancedPrompt = prompt + ", " + styleConfig.prompt;
+      }
+    }
+    
+    // 2. 增強負面提示詞
+    let enhancedNegative = negativePrompt || "";
+    if (styleConfig.negative) {
+      const lowerNegative = enhancedNegative.toLowerCase();
+      const lowerStyleNegative = styleConfig.negative.toLowerCase();
+      
+      if (!lowerNegative.includes(lowerStyleNegative)) {
+        enhancedNegative = enhancedNegative ? 
+          (enhancedNegative + ", " + styleConfig.negative) : 
+          styleConfig.negative;
+      }
+    }
+    
+    return { 
+      enhancedPrompt, 
+      enhancedNegative,
+      styleName: styleConfig.name,
+      styleApplied: true
+    };
+  }
+  
+  /**
+   * 獲取風格列表
+   * @returns {Array} - 風格列表
+   */
+  static getStylesList() {
+    return Object.entries(CONFIG.STYLE_PRESETS).map(([key, config]) => ({
+      id: key,
+      name: config.name,
+      prompt: config.prompt,
+      negative: config.negative
+    }));
+  }
 }
-// 接續 JavaScript
-function getHTMLScript4() {
-  return `
-    // Canvas 初始化
-    function initCanvas() {
-      canvas = document.getElementById('inpaintCanvas');
-      if (!canvas) return;
+
+// ==================== 圖像生成層 ====================
+
+/**
+ * Pollinations.ai 提供商
+ * 處理圖像生成的核心邏輯
+ */
+class PollinationsProvider {
+  constructor(config, env = null) {
+    this.name = config.name;
+    this.config = config;
+    this.env = env;
+  }
+  
+  /**
+   * 生成圖像（核心方法）
+   * @param {string} prompt - 提示詞
+   * @param {Object} options - 生成選項
+   * @param {Logger} logger - 日誌記錄器
+   * @returns {Promise<Object>} - 生成結果
+   */
+  async generate(prompt, options, logger) {
+    const startTime = Date.now();
+    
+    // ============ 階段 1: 參數解析 ============
+    const {
+      model = "flux",
+      width = 1024,
+      height = 1024,
+      seed = -1,
+      negativePrompt = "",
+      guidance = null,
+      steps = null,
+      enhance = false,
+      nologo = true,
+      privateMode = true,
+      style = "none",
+      autoOptimize = true,
+      autoHD = true,
+      qualityMode = 'standard',
+      referenceImages = []
+    } = options;
+    
+    logger.add("參數解析", { model, width, height, seed, style, qualityMode });
+    
+    // ============ 階段 2: 模型驗證 ============
+    const modelConfig = this.config.models.find(m => m.id === model);
+    if (!modelConfig) {
+      throw new Error(`模型 ${model} 不存在`);
+    }
+    
+    logger.add("模型配置", { 
+      name: modelConfig.name, 
+      category: modelConfig.category,
+      confirmed: modelConfig.confirmed,
+      max_size: modelConfig.max_size
+    });
+    
+    // ============ 階段 3: 參考圖驗證 ============
+    const maxRefImages = modelConfig.max_reference_images || 0;
+    let validReferenceImages = [];
+    let generationMode = "文生圖";
+    
+    if (referenceImages && referenceImages.length > 0) {
+      if (!modelConfig.supports_reference_images) {
+        logger.add("⚠️ 警告", `模型 ${model} 不支持參考圖，已忽略`);
+      } else if (referenceImages.length > maxRefImages) {
+        validReferenceImages = referenceImages.slice(0, maxRefImages);
+        logger.add("⚠️ 警告", `參考圖數量超限，僅使用前 ${maxRefImages} 張`);
+      } else {
+        validReferenceImages = referenceImages;
+      }
       
-      ctx = canvas.getContext('2d');
-      canvas.width = 1024;
-      canvas.height = 1024;
-      
-      canvas.addEventListener('mousedown', startDrawing);
-      canvas.addEventListener('mousemove', draw);
-      canvas.addEventListener('mouseup', stopDrawing);
-      canvas.addEventListener('mouseout', stopDrawing);
-      
-      // 觸控支持
-      canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const mouseEvent = new MouseEvent('mousedown', {
-          clientX: touch.clientX,
-          clientY: touch.clientY
+      if (validReferenceImages.length > 0) {
+        generationMode = validReferenceImages.length === 1 ? "圖生圖" : "多圖融合";
+        logger.add("參考圖", { 
+          count: validReferenceImages.length, 
+          mode: generationMode,
+          urls: validReferenceImages
         });
-        canvas.dispatchEvent(mouseEvent);
-      });
-      
-      canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const mouseEvent = new MouseEvent('mousemove', {
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        });
-        canvas.dispatchEvent(mouseEvent);
-      });
-      
-      canvas.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        const mouseEvent = new MouseEvent('mouseup', {});
-        canvas.dispatchEvent(mouseEvent);
-      });
-    }
-
-    function startDrawing(e) {
-      isDrawing = true;
-      draw(e);
-    }
-
-    function draw(e) {
-      if (!isDrawing) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-      
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.beginPath();
-      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function stopDrawing() {
-      isDrawing = false;
-    }
-
-    function clearMask() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      showStatus('遮罩已清除', 'info');
-    }
-
-    function adjustBrushSize(delta) {
-      brushSize = Math.max(10, Math.min(100, brushSize + delta));
-      showStatus(\`筆刷大小: \${brushSize}px\`, 'info');
-    }
-
-    // 載入歷史記錄
-    async function loadHistory() {
-      try {
-        const response = await fetch('/api/history');
-        const history = await response.json();
-        const grid = document.getElementById('historyGrid');
-        
-        if (!history || history.length === 0) {
-          grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px; grid-column: 1 / -1;">尚無生成記錄</p>';
-          return;
-        }
-        
-        grid.innerHTML = history.slice(0, 20).map(item => \`
-          <div class="history-item" onclick='displayImage(\${JSON.stringify(item).replace(/'/g, "&#39;")})'>
-            <img src="\${item.url}" alt="\${item.prompt}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100\\' height=\\'100\\'%3E%3Crect fill=\\'%23333\\' width=\\'100\\' height=\\'100\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\' fill=\\'%23666\\'%3EError%3C/text%3E%3C/svg%3E'">
-            <button class="delete-btn" onclick="deleteHistory('\${item.id}', event)" title="刪除">×</button>
-            <div class="overlay">
-              <p title="\${item.prompt}">\${item.prompt.slice(0, 40)}...</p>
-              <p style="font-size: 9px; opacity: 0.7;">\${new Date(item.timestamp).toLocaleString('zh-TW', {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'})}</p>
-            </div>
-          </div>
-        \`).join('');
-      } catch (error) {
-        console.error('載入歷史失敗:', error);
       }
     }
-
-    // 刪除歷史記錄
-    async function deleteHistory(id, event) {
-      event.stopPropagation();
-      if (!confirm('確定要刪除此記錄嗎?')) return;
+    
+    // ============ 階段 4: 提示詞複雜度分析 ============
+    const promptComplexity = PromptAnalyzer.analyzeComplexity(prompt);
+    const recommendedQuality = PromptAnalyzer.recommendQualityMode(prompt, model);
+    
+    logger.add("提示詞分析", { 
+      complexity: promptComplexity.toFixed(2), 
+      recommended_quality: recommendedQuality 
+    });
+    
+    // ============ 階段 5: HD 優化 ============
+    let finalPrompt = prompt;
+    let finalNegativePrompt = negativePrompt;
+    let finalWidth = width;
+    let finalHeight = height;
+    let hdOptimization = null;
+    
+    if (autoHD) {
+      hdOptimization = HDOptimizer.optimize(
+        prompt, 
+        negativePrompt, 
+        model, 
+        width, 
+        height, 
+        qualityMode, 
+        autoHD
+      );
       
-      try {
-        const response = await fetch('/api/history/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        });
-        
-        const result = await response.json();
-        if (result.success) {
-          showStatus('✅ 記錄已刪除', 'success');
-          loadHistory();
-        } else {
-          showStatus('刪除失敗', 'error');
+      finalPrompt = hdOptimization.prompt;
+      finalNegativePrompt = hdOptimization.negativePrompt;
+      finalWidth = hdOptimization.width;
+      finalHeight = hdOptimization.height;
+      
+      logger.add("HD優化", {
+        optimized: hdOptimization.optimized,
+        quality_mode: qualityMode,
+        hd_level: hdOptimization.hdLevel,
+        optimizations: hdOptimization.optimizations
+      });
+    }
+    
+    // ============ 階段 6: 參數優化 ============
+    let finalSteps = steps;
+    let finalGuidance = guidance || 7.5;
+    
+    if (autoOptimize) {
+      const stepsOpt = ParameterOptimizer.optimizeSteps(
+        model, 
+        finalWidth, 
+        finalHeight, 
+        style, 
+        qualityMode, 
+        steps
+      );
+      
+      finalSteps = stepsOpt.steps;
+      
+      if (!guidance) {
+        finalGuidance = ParameterOptimizer.optimizeGuidance(model, style, qualityMode);
+      }
+      
+      logger.add("參數優化", {
+        steps: finalSteps,
+        steps_reasoning: stepsOpt.reasoning,
+        guidance: finalGuidance.toFixed(1)
+      });
+    } else if (!finalSteps) {
+      finalSteps = 20;  // 默認步數
+    }
+    
+    // ============ 階段 7: 風格處理 ============
+    const styleResult = StyleProcessor.applyStyle(finalPrompt, style, finalNegativePrompt);
+    const styledPrompt = styleResult.enhancedPrompt;
+    const styledNegative = styleResult.enhancedNegative;
+    
+    if (styleResult.styleApplied) {
+      logger.add("風格應用", { 
+        style: style, 
+        style_name: styleResult.styleName 
+      });
+    }
+    
+    // ============ 階段 8: 中文翻譯 ============
+    const translation = await translateToEnglish(styledPrompt, this.env);
+    const finalPromptForAPI = translation.text;
+    
+    if (translation.translated) {
+      logger.add("翻譯完成", { 
+        model: translation.model,
+        original_length: translation.original?.length,
+        translated_length: finalPromptForAPI.length
+      });
+    }
+    
+    // ============ 階段 9: 構建 API URL ============
+    const currentSeed = seed === -1 ? Math.floor(Math.random() * 1000000) : seed;
+    
+    // 組合完整提示詞（負面提示詞格式：[negative: xxx]）
+    let fullPrompt = finalPromptForAPI;
+    if (styledNegative) {
+      fullPrompt += " [negative: " + styledNegative + "]";
+    }
+    
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    let url = `${this.config.endpoint}/prompt/${encodedPrompt}`;
+    
+    // 構建查詢參數
+    const params = new URLSearchParams();
+    params.append('model', model);
+    params.append('width', finalWidth.toString());
+    params.append('height', finalHeight.toString());
+    params.append('seed', currentSeed.toString());
+    params.append('nologo', nologo ? 'true' : 'false');
+    params.append('enhance', enhance ? 'true' : 'false');
+    params.append('private', privateMode ? 'true' : 'false');
+    
+    // 參考圖（多個用逗號分隔）
+    if (validReferenceImages.length > 0) {
+      params.append('image', validReferenceImages.join(','));
+    }
+    
+    // 僅在非默認值時添加
+    if (finalGuidance !== 7.5) {
+      params.append('guidance', finalGuidance.toFixed(1));
+    }
+    if (finalSteps !== 20) {
+      params.append('steps', finalSteps.toString());
+    }
+    
+    url += '?' + params.toString();
+    
+    logger.add("API請求", { 
+      url_length: url.length,
+      seed: currentSeed,
+      final_size: `${finalWidth}x${finalHeight}`
+    });
+    
+    // ============ 階段 10: 發送請求（含回退機制）============
+    const modelsToTry = [model];
+    
+    // 添加回退模型
+    if (modelConfig.fallback && modelConfig.fallback.length > 0) {
+      modelsToTry.push(...modelConfig.fallback);
+      logger.add("回退策略", { models: modelsToTry });
+    }
+    
+    let lastError = null;
+    
+    for (let modelIndex = 0; modelIndex < modelsToTry.length; modelIndex++) {
+      const tryModel = modelsToTry[modelIndex];
+      const isFallback = modelIndex > 0;
+      
+      if (isFallback) {
+        // 更新URL中的模型參數
+        url = url.replace(/model=[^&]+/, `model=${tryModel}`);
+        logger.add("嘗試回退模型", { model: tryModel, attempt: modelIndex + 1 });
+      }
+      
+      // 重試3次
+      for (let retry = 0; retry < CONFIG.MAX_RETRIES; retry++) {
+        try {
+          const response = await fetchWithTimeout(url, {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'image/*,*/*',
+              'Referer': 'https://pollinations.ai/',
+              'Origin': 'https://pollinations.ai'
+            }
+          }, CONFIG.FETCH_TIMEOUT);
+          
+          // 檢查響應
+          if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.startsWith('image/')) {
+              const duration = Date.now() - startTime;
+              
+              logger.add("✅ 生成成功", { 
+                model: tryModel,
+                duration_ms: duration,
+                is_fallback: isFallback,
+                retry_count: retry
+              });
+              
+              return {
+                url: response.url,
+                provider: this.name,
+                model: tryModel,
+                seed: currentSeed,
+                width: finalWidth,
+                height: finalHeight,
+                is_4k: finalWidth >= 4096 || finalHeight >= 4096,
+                quality_mode: qualityMode,
+                style: style,
+                style_name: styleResult.styleName || "無",
+                auto_translated: translation.translated,
+                translation_model: translation.model,
+                prompt_complexity: promptComplexity.toFixed(2),
+                reference_images: validReferenceImages,
+                reference_images_count: validReferenceImages.length,
+                generation_mode: generationMode,
+                steps: finalSteps,
+                guidance: finalGuidance,
+                hd_optimizations: hdOptimization?.optimizations || [],
+                generation_time_ms: duration,
+                cost: "FREE",
+                is_fallback: isFallback,
+                debug_logs: logger.get()
+              };
+            } else {
+              lastError = `Invalid content type: ${contentType}`;
+              logger.add("⚠️ 內容類型錯誤", { contentType });
+            }
+          } else {
+            lastError = `HTTP ${response.status}: ${response.statusText}`;
+            logger.add("⚠️ HTTP錯誤", { status: response.status, statusText: response.statusText });
+          }
+          
+        } catch (error) {
+          lastError = error.message;
+          logger.add("⚠️ 請求失敗", { 
+            error: error.message, 
+            retry: retry + 1,
+            model: tryModel
+          });
+          
+          // 等待後重試
+          if (retry < CONFIG.MAX_RETRIES - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
+          }
         }
-      } catch (error) {
-        console.error('刪除錯誤:', error);
-        showStatus('刪除失敗', 'error');
       }
     }
-  `;
+    
+    // 所有模型和重試都失敗
+    throw new Error(`圖像生成失敗: ${lastError}\n\n調試日誌:\n${JSON.stringify(logger.get(), null, 2)}`);
+  }
 }
-// 接續 JavaScript - 最後部分
-function getHTMLScript5() {
-  return `
-    // 下載圖片
-    function downloadImage() {
-      if (!currentRecord || !currentRecord.image) {
-        showStatus('沒有可下載的圖片', 'error');
-        return;
-      }
-      
-      const a = document.createElement('a');
-      a.href = currentRecord.image;
-      a.download = \`pollinations-ai-\${currentRecord.id}.png\`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      showStatus('✅ 下載開始', 'success');
-    }
 
-    // 複製提示詞
-    function copyPrompt() {
-      if (!currentRecord || !currentRecord.prompt) {
-        showStatus('沒有可複製的提示詞', 'error');
-        return;
+/**
+ * 多提供商路由器
+ * 管理不同提供商，支持批量生成
+ */
+class MultiProviderRouter {
+  constructor(apiKeys = {}, env = null) {
+    this.providers = {};
+    this.env = env;
+    
+    // 初始化所有啟用的提供商
+    for (const [key, config] of Object.entries(CONFIG.PROVIDERS)) {
+      if (config.enabled) {
+        if (key === 'pollinations') {
+          this.providers[key] = new PollinationsProvider(config, env);
+        }
+        // 未來可在此添加其他提供商
       }
+    }
+  }
+  
+  /**
+   * 獲取提供商實例
+   * @param {string} name - 提供商名稱
+   * @returns {Object} - { name: string, instance: Provider }
+   */
+  getProvider(name = null) {
+    if (!name) {
+      // 使用默認提供商
+      name = CONFIG.DEFAULT_PROVIDER;
+    }
+    
+    const provider = this.providers[name];
+    if (!provider) {
+      throw new Error(`提供商 ${name} 不存在或未啟用`);
+    }
+    
+    return { name, instance: provider };
+  }
+  
+  /**
+   * 生成圖像（支持批量）
+   * @param {string} prompt - 提示詞
+   * @param {Object} options - 生成選項
+   * @param {Logger} logger - 日誌記錄器
+   * @returns {Promise<Array>} - 生成結果數組
+   */
+  async generate(prompt, options, logger) {
+    const { provider: requestedProvider = null, numOutputs = 1 } = options;
+    
+    // 選擇提供商
+    const { name: providerName, instance: provider } = this.getProvider(requestedProvider);
+    logger.add("選擇提供商", { provider: providerName, num_outputs: numOutputs });
+    
+    // 批量生成（Seed自動遞增）
+    const results = [];
+    for (let i = 0; i < numOutputs; i++) {
+      const imageLogger = new Logger();
+      imageLogger.add("開始生成", { index: i + 1, total: numOutputs });
       
-      navigator.clipboard.writeText(currentRecord.prompt).then(() => {
-        showStatus('✅ 提示詞已複製', 'success');
-      }).catch(() => {
-        showStatus('複製失敗', 'error');
+      // 複製選項，處理 Seed
+      const currentOptions = { 
+        ...options,
+        seed: options.seed === -1 ? -1 : (options.seed + i)
+      };
+      
+      try {
+        const result = await provider.generate(prompt, currentOptions, imageLogger);
+        results.push(result);
+        
+        logger.add(`圖片 ${i + 1} 完成`, { 
+          seed: result.seed,
+          url_length: result.url.length
+        });
+      } catch (error) {
+        logger.add(`圖片 ${i + 1} 失敗`, { error: error.message });
+        
+        // 批量生成時，一個失敗不影響其他
+        results.push({
+          error: error.message,
+          index: i + 1,
+          failed: true
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * 獲取提供商列表
+   * @returns {Array} - 提供商信息數組
+   */
+  getProvidersList() {
+    return Object.entries(CONFIG.PROVIDERS)
+      .filter(([_, config]) => config.enabled)
+      .map(([key, config]) => ({
+        id: key,
+        name: config.name,
+        description: config.description,
+        type: config.type,
+        default: config.default || false,
+        features: config.features,
+        models_count: config.models.length
+      }));
+  }
+}
+
+/**
+ * 帶超時的 fetch
+ * @param {string} url - 請求URL
+ * @param {Object} options - fetch選項
+ * @param {number} timeout - 超時時間（毫秒）
+ * @returns {Promise<Response>} - 響應對象
+ */
+async function fetchWithTimeout(url, options = {}, timeout = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`請求超時 (${timeout}ms)`);
+    }
+    throw error;
+  }
+}
+// ==================== API 端點處理器 ====================
+
+/**
+ * 處理圖像生成請求
+ * POST /v1/images/generations
+ */
+async function handleImageGenerations(request, env, ctx) {
+  const logger = new Logger();
+  const startTime = Date.now();
+  
+  try {
+    // 1. 解析請求體
+    const body = await request.json();
+    logger.add("收到請求", { 
+      has_prompt: !!body.prompt,
+      model: body.model,
+      size: body.size || `${body.width}x${body.height}`
+    });
+    
+    // 2. 驗證必填參數
+    const prompt = body.prompt;
+    if (!prompt || !prompt.trim()) {
+      throw new Error("提示詞 (prompt) 為必填項");
+    }
+    
+    if (prompt.length > 2000) {
+      throw new Error("提示詞長度不能超過 2000 字符");
+    }
+    
+    // 3. 處理尺寸
+    let width = 1024;
+    let height = 1024;
+    
+    if (body.size) {
+      // 支持 "1024x1024" 格式
+      const sizeParts = body.size.split('x').map(Number);
+      if (sizeParts.length === 2 && sizeParts.every(n => !isNaN(n) && n > 0)) {
+        [width, height] = sizeParts;
+      } else {
+        throw new Error("尺寸格式錯誤，應為 'widthxheight' 如 '1024x1024'");
+      }
+    }
+    
+    // 寬高可單獨指定，優先級高於 size
+    if (body.width !== undefined) width = body.width;
+    if (body.height !== undefined) height = body.height;
+    
+    // 驗證尺寸範圍
+    width = Math.min(Math.max(width, 256), 4096);
+    height = Math.min(Math.max(height, 256), 4096);
+    
+    // 4. 處理 Seed
+    const seedInput = body.seed !== undefined ? body.seed : -1;
+    let seedValue = -1;
+    
+    if (seedInput !== -1) {
+      const parsedSeed = parseInt(seedInput);
+      if (isNaN(parsedSeed) || parsedSeed < 0 || parsedSeed > 999999) {
+        throw new Error('Seed 必須是 0-999999 之間的整數，或 -1 表示隨機');
+      }
+      seedValue = parsedSeed;
+    }
+    
+    // 5. 處理參考圖
+    let referenceImages = [];
+    if (body.reference_images && Array.isArray(body.reference_images)) {
+      // 驗證 URL 格式
+      referenceImages = body.reference_images.filter(url => {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          logger.add("⚠️ 無效的參考圖URL", { url });
+          return false;
+        }
       });
-    }
-
-    // 分享圖片
-    function shareImage() {
-      if (!currentRecord) {
-        showStatus('沒有可分享的圖片', 'error');
-        return;
+      
+      if (referenceImages.length !== body.reference_images.length) {
+        logger.add("⚠️ 部分參考圖URL無效", {
+          original: body.reference_images.length,
+          valid: referenceImages.length
+        });
       }
+    }
+    
+    // 6. 組裝生成選項
+    const options = {
+      provider: body.provider || null,
+      model: body.model || "flux",
+      width: width,
+      height: height,
+      numOutputs: Math.min(Math.max(body.n || 1, 1), 4),  // 限制 1-4 張
+      seed: seedValue,
+      negativePrompt: body.negative_prompt || "",
+      guidance: body.guidance_scale || null,
+      steps: body.steps || null,
+      enhance: body.enhance === true,
+      nologo: body.nologo !== false,
+      privateMode: body.private !== false,
+      style: body.style || "none",
+      autoOptimize: body.auto_optimize !== false,
+      autoHD: body.auto_hd !== false,
+      qualityMode: body.quality_mode || 'standard',
+      referenceImages: referenceImages
+    };
+    
+    logger.add("選項配置", options);
+    
+    // 7. 檢查緩存（僅限固定 seed 單圖無參考圖）
+    let cacheKey = null;
+    let cachedResult = null;
+    
+    if (options.seed !== -1 && 
+        options.numOutputs === 1 && 
+        referenceImages.length === 0 &&
+        API_OPTIMIZATION.CACHE.enabled) {
       
-      const shareText = \`AI Studio 生成 - \${currentRecord.prompt.slice(0, 100)}\`;
+      cacheKey = generateCacheKey(prompt, options);
+      cachedResult = apiCache.get(cacheKey);
       
-      if (navigator.share) {
-        navigator.share({
-          title: 'AI Studio',
-          text: shareText,
-          url: window.location.href
-        }).then(() => {
-          showStatus('✅ 分享成功', 'success');
-        }).catch(() => {
-          // 回退到複製
-          fallbackShare(shareText);
+      if (cachedResult) {
+        logger.add("✅ 緩存命中", { cache_key: cacheKey });
+        
+        const duration = Date.now() - startTime;
+        perfMonitor.recordRequest(true, duration);
+        
+        return new Response(JSON.stringify({
+          created: Math.floor(Date.now() / 1000),
+          data: cachedResult,
+          cached: true,
+          cache_key: cacheKey,
+          cache_hit_time_ms: duration
+        }), {
+          status: 200,
+          headers: corsHeaders({
+            'Content-Type': 'application/json',
+            'X-Cache': 'HIT',
+            'X-Cache-Key': cacheKey
+          })
         });
       } else {
-        fallbackShare(shareText);
+        logger.add("緩存未命中", { cache_key: cacheKey });
       }
     }
-
-    function fallbackShare(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        showStatus('✅ 分享文字已複製', 'success');
-      }).catch(() => {
-        showStatus('分享失敗', 'error');
+    
+    // 8. 執行生成
+    const router = new MultiProviderRouter({}, env);
+    const results = await router.generate(prompt, options, logger);
+    
+    // 9. 過濾失敗的結果
+    const successResults = results.filter(r => !r.failed);
+    const failedResults = results.filter(r => r.failed);
+    
+    if (successResults.length === 0) {
+      throw new Error("所有圖像生成均失敗");
+    }
+    
+    if (failedResults.length > 0) {
+      logger.add("⚠️ 部分生成失敗", {
+        success: successResults.length,
+        failed: failedResults.length
       });
     }
+    
+    // 10. 保存緩存
+    if (cacheKey && options.seed !== -1 && API_OPTIMIZATION.CACHE.enabled) {
+      const cacheData = successResults.map(r => ({
+        url: r.url,
+        provider: r.provider,
+        model: r.model,
+        seed: r.seed,
+        width: r.width,
+        height: r.height,
+        is_4k: r.is_4k,
+        quality_mode: r.quality_mode,
+        style: r.style,
+        style_name: r.style_name,
+        generation_mode: r.generation_mode,
+        cost: r.cost
+      }));
+      
+      apiCache.set(cacheKey, cacheData);
+      logger.add("緩存已保存", { cache_key: cacheKey });
+    }
+    
+    // 11. 返回結果
+    const duration = Date.now() - startTime;
+    perfMonitor.recordRequest(true, duration);
+    
+    const responseData = {
+      created: Math.floor(Date.now() / 1000),
+      data: successResults.map(r => ({
+        url: r.url,
+        provider: r.provider,
+        model: r.model,
+        seed: r.seed,
+        width: r.width,
+        height: r.height,
+        is_4k: r.is_4k,
+        reference_images: r.reference_images || [],
+        reference_images_count: r.reference_images_count || 0,
+        generation_mode: r.generation_mode || "文生圖",
+        style: r.style,
+        style_name: r.style_name,
+        quality_mode: r.quality_mode,
+        prompt_complexity: r.prompt_complexity,
+        auto_translated: r.auto_translated,
+        steps: r.steps,
+        guidance: r.guidance,
+        hd_optimizations: r.hd_optimizations || [],
+        cost: r.cost
+      })),
+      cached: false,
+      generation_time_ms: duration,
+      success_count: successResults.length,
+      failed_count: failedResults.length
+    };
+    
+    // 添加失敗信息（如果有）
+    if (failedResults.length > 0) {
+      responseData.partial_failure = true;
+      responseData.failures = failedResults.map(r => ({
+        index: r.index,
+        error: r.error
+      }));
+    }
+    
+    return new Response(JSON.stringify(responseData), {
+      status: 200,
+      headers: corsHeaders({
+        'Content-Type': 'application/json',
+        'X-Cache': 'MISS',
+        'X-Generation-Time': duration + 'ms'
+      })
+    });
+    
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    perfMonitor.recordRequest(false, duration, error.message);
+    
+    logger.add("❌ 請求失敗", { error: error.message, stack: error.stack });
+    
+    return new Response(JSON.stringify({
+      error: {
+        message: error.message,
+        type: 'generation_error',
+        code: 'GENERATION_FAILED'
+      },
+      debug_logs: logger.get(),
+      generation_time_ms: duration
+    }), {
+      status: 500,
+      headers: corsHeaders({ 'Content-Type': 'application/json' })
+    });
+  }
+}
 
-    // 更新範圍值顯示
-    function updateRangeValue(id) {
-      const input = document.getElementById(id);
-      const display = document.getElementById(id + 'Value');
-      if (display) {
-        display.textContent = input.value;
+/**
+ * 處理 ChatGPT 兼容請求
+ * POST /v1/chat/completions
+ */
+async function handleChatCompletions(request, env, ctx) {
+  const logger = new Logger();
+  
+  try {
+    const body = await request.json();
+    const messages = body.messages;
+    
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error("messages 為必填項且必須是非空數組");
+    }
+    
+    // 提取最後一條用戶消息
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length === 0) {
+      throw new Error("未找到用戶消息");
+    }
+    
+    const lastUserMessage = userMessages[userMessages.length - 1];
+    const prompt = lastUserMessage.content;
+    
+    if (!prompt || !prompt.trim()) {
+      throw new Error("用戶消息內容不能為空");
+    }
+    
+    logger.add("ChatGPT請求", { prompt_length: prompt.length });
+    
+    // 使用默認參數生成
+    const options = {
+      model: body.model || "flux",
+      width: 1024,
+      height: 1024,
+      numOutputs: 1,
+      seed: -1,
+      style: "none",
+      autoOptimize: true,
+      autoHD: true,
+      qualityMode: "standard"
+    };
+    
+    const router = new MultiProviderRouter({}, env);
+    const results = await router.generate(prompt, options, logger);
+    
+    if (results.length === 0 || results[0].failed) {
+      throw new Error("圖像生成失敗");
+    }
+    
+    const result = results[0];
+    const imageUrl = result.url;
+    
+    // 返回 OpenAI Chat 格式
+    return new Response(JSON.stringify({
+      id: "chatcmpl-" + Date.now(),
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: result.model,
+      choices: [{
+        index: 0,
+        message: {
+          role: "assistant",
+          content: `![Generated Image](${imageUrl})\n\n✅ 圖像生成成功！\n\n**模型**: ${result.model}\n**尺寸**: ${result.width}x${result.height}\n**Seed**: ${result.seed}\n**風格**: ${result.style_name}`
+        },
+        finish_reason: "stop"
+      }],
+      usage: {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+      }
+    }), {
+      status: 200,
+      headers: corsHeaders({ 'Content-Type': 'application/json' })
+    });
+    
+  } catch (error) {
+    logger.add("❌ ChatGPT請求失敗", { error: error.message });
+    
+    return new Response(JSON.stringify({
+      error: {
+        message: error.message,
+        type: 'chat_completion_error',
+        code: 'CHAT_ERROR'
+      }
+    }), {
+      status: 500,
+      headers: corsHeaders({ 'Content-Type': 'application/json' })
+    });
+  }
+}
+
+/**
+ * 獲取模型列表
+ * GET /v1/models
+ */
+function handleModelsRequest() {
+  const allModels = [];
+  
+  for (const [providerKey, providerConfig] of Object.entries(CONFIG.PROVIDERS)) {
+    if (!providerConfig.enabled) continue;
+    
+    for (const model of providerConfig.models) {
+      allModels.push({
+        id: model.id,
+        name: model.name,
+        category: model.category,
+        description: model.description,
+        confirmed: model.confirmed,
+        experimental: model.experimental || false,
+        max_size: model.max_size,
+        supports_reference_images: model.supports_reference_images || false,
+        max_reference_images: model.max_reference_images || 0,
+        ultra_hd: model.ultra_hd || false,
+        fallback: model.fallback || [],
+        provider: providerKey
+      });
+    }
+  }
+  
+  return new Response(JSON.stringify({
+    object: 'list',
+    data: allModels,
+    total: allModels.length
+  }), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
+
+/**
+ * 獲取提供商列表
+ * GET /v1/providers
+ */
+function handleProvidersRequest() {
+  const router = new MultiProviderRouter();
+  const providers = router.getProvidersList();
+  
+  return new Response(JSON.stringify({
+    object: 'list',
+    data: providers,
+    total: providers.length
+  }), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
+
+/**
+ * 獲取風格列表
+ * GET /v1/styles
+ */
+function handleStylesRequest() {
+  const styles = StyleProcessor.getStylesList();
+  
+  return new Response(JSON.stringify({
+    object: 'list',
+    data: styles,
+    total: styles.length
+  }), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
+
+/**
+ * 獲取尺寸預設列表
+ * GET /v1/sizes
+ */
+function handleSizesRequest() {
+  const sizes = Object.entries(CONFIG.PRESET_SIZES).map(([key, config]) => ({
+    id: key,
+    name: config.name,
+    width: config.width,
+    height: config.height,
+    exclusive: config.exclusive || null
+  }));
+  
+  return new Response(JSON.stringify({
+    object: 'list',
+    data: sizes,
+    total: sizes.length
+  }), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
+
+/**
+ * 健康檢查
+ * GET /health
+ */
+function handleHealthRequest(env) {
+  const health = {
+    status: 'ok',
+    version: CONFIG.PROJECT_VERSION,
+    timestamp: new Date().toISOString(),
+    workers_ai: !!env.AI,
+    performance: perfMonitor.getStats(),
+    cache: {
+      enabled: API_OPTIMIZATION.CACHE.enabled,
+      size: apiCache.cache.size,
+      max_size: API_OPTIMIZATION.CACHE.max_size
+    },
+    rate_limit: {
+      enabled: API_OPTIMIZATION.RATE_LIMIT.enabled,
+      active_ips: rateLimiter.requests.size,
+      blacklisted_ips: rateLimiter.blacklist.size
+    }
+  };
+  
+  return new Response(JSON.stringify(health), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
+
+/**
+ * 性能統計
+ * GET /stats
+ */
+function handleStatsRequest() {
+  const stats = {
+    performance: perfMonitor.getStats(),
+    cache: {
+      size: apiCache.cache.size,
+      max_size: API_OPTIMIZATION.CACHE.max_size,
+      strategy: API_OPTIMIZATION.CACHE.strategy
+    },
+    rate_limit: {
+      active_monitoring: rateLimiter.requests.size,
+      blacklisted: rateLimiter.blacklist.size,
+      limits: {
+        per_minute: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute,
+        per_hour: API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour
       }
     }
+  };
+  
+  return new Response(JSON.stringify(stats), {
+    status: 200,
+    headers: corsHeaders({ 'Content-Type': 'application/json' })
+  });
+}
 
-    // 顯示狀態訊息
-    function showStatus(message, type) {
-      const status = document.getElementById('status');
-      if (!status) return;
-      
-      status.textContent = message;
-      status.className = 'status ' + type;
-      
-      if (type === 'success') {
-        setTimeout(() => {
-          status.textContent = '';
-          status.className = 'status';
-        }, 3000);
-      }
+/**
+ * CORS 頭部生成器
+ * @param {Object} additional - 額外頭部
+ * @returns {Headers} - Headers 對象
+ */
+function corsHeaders(additional = {}) {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    ...additional
+  };
+}
+// ==================== 主入口 ====================
+
+/**
+ * Cloudflare Workers 主入口
+ * 處理所有HTTP請求
+ */
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const startTime = Date.now();
+    const clientIP = getClientIP(request);
+    
+    // 1. OPTIONS 預檢請求（CORS）
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders()
+      });
     }
-
-    // 快捷鍵支持
-    document.addEventListener('keydown', (e) => {
-      // Ctrl+Enter 或 Cmd+Enter 生成
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        generate();
+    
+    // 2. 速率限制檢查（僅 API 路由）
+    if (API_OPTIMIZATION.RATE_LIMIT.enabled && url.pathname.startsWith('/v1/')) {
+      const rateLimitResult = await rateLimiter.check(clientIP);
+      
+      if (!rateLimitResult.allowed) {
+        perfMonitor.recordRequest(false, Date.now() - startTime, rateLimitResult.reason);
+        
+        return new Response(JSON.stringify({
+          error: {
+            message: rateLimitResult.reason,
+            code: 'RATE_LIMIT_EXCEEDED',
+            limit: rateLimitResult.limit,
+            current: rateLimitResult.current,
+            retryAfter: rateLimitResult.retryAfter,
+            blockedUntil: rateLimitResult.blockedUntil
+          }
+        }), {
+          status: 429,
+          headers: corsHeaders({
+            'Content-Type': 'application/json',
+            'Retry-After': (rateLimitResult.retryAfter || 60).toString(),
+            'X-RateLimit-Limit-Minute': API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute.toString(),
+            'X-RateLimit-Limit-Hour': API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour.toString()
+          })
+        });
       }
-      // Ctrl+D 或 Cmd+D 下載
-      else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-        e.preventDefault();
-        downloadImage();
+      
+      // 保存速率限制信息到 context
+      ctx.rateLimitHeaders = {
+        'X-RateLimit-Limit-Minute': API_OPTIMIZATION.RATE_LIMIT.max_requests_per_minute.toString(),
+        'X-RateLimit-Limit-Hour': API_OPTIMIZATION.RATE_LIMIT.max_requests_per_hour.toString(),
+        'X-RateLimit-Remaining-Minute': (rateLimitResult.remaining?.perMinute || 0).toString(),
+        'X-RateLimit-Remaining-Hour': (rateLimitResult.remaining?.perHour || 0).toString()
+      };
+    }
+    
+    // 3. 路由分發
+    try {
+      let response;
+      
+      // Web UI
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        response = handleUI(request);
       }
-    });
+      // ChatGPT 兼容端點
+      else if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
+        response = await handleChatCompletions(request, env, ctx);
+      }
+      // 圖像生成主端點
+      else if (url.pathname === '/v1/images/generations' && request.method === 'POST') {
+        response = await handleImageGenerations(request, env, ctx);
+      }
+      // 模型列表
+      else if (url.pathname === '/v1/models' && request.method === 'GET') {
+        response = handleModelsRequest();
+      }
+      // 提供商列表
+      else if (url.pathname === '/v1/providers' && request.method === 'GET') {
+        response = handleProvidersRequest();
+      }
+      // 風格列表
+      else if (url.pathname === '/v1/styles' && request.method === 'GET') {
+        response = handleStylesRequest();
+      }
+      // 尺寸列表
+      else if (url.pathname === '/v1/sizes' && request.method === 'GET') {
+        response = handleSizesRequest();
+      }
+      // 健康檢查
+      else if (url.pathname === '/health' && request.method === 'GET') {
+        response = handleHealthRequest(env);
+      }
+      // 性能統計
+      else if (url.pathname === '/stats' && request.method === 'GET') {
+        response = handleStatsRequest();
+      }
+      // 404 - 默認返回項目信息
+      else {
+        response = new Response(JSON.stringify({
+          project: CONFIG.PROJECT_NAME,
+          version: CONFIG.PROJECT_VERSION,
+          status: 'ok',
+          endpoints: {
+            ui: '/',
+            generate: 'POST /v1/images/generations',
+            chat: 'POST /v1/chat/completions',
+            models: 'GET /v1/models',
+            providers: 'GET /v1/providers',
+            styles: 'GET /v1/styles',
+            sizes: 'GET /v1/sizes',
+            health: 'GET /health',
+            stats: 'GET /stats'
+          },
+          docs: 'https://github.com/kinai9661/Flux-AI-Pro',
+          features: [
+            '17 AI 模型',
+            '39 種藝術風格',
+            '33 種尺寸預設',
+            '4K 超清支持',
+            'Seed 控制',
+            '批量生成（1-4張）',
+            '圖生圖 + 多圖融合',
+            '中文自動翻譯',
+            'HD 智能優化',
+            '本地歷史記錄'
+          ]
+        }), {
+          status: 200,
+          headers: corsHeaders({ 'Content-Type': 'application/json' })
+        });
+      }
+      
+      // 4. 添加響應頭 + 性能監控
+      const duration = Date.now() - startTime;
+      perfMonitor.recordRequest(true, duration);
+      
+      const headers = new Headers(response.headers);
+      headers.set('X-Response-Time', duration + 'ms');
+      headers.set('X-Worker-Version', CONFIG.PROJECT_VERSION);
+      headers.set('X-Client-IP', clientIP);
+      
+      // 添加速率限制頭部
+      if (ctx.rateLimitHeaders) {
+        Object.entries(ctx.rateLimitHeaders).forEach(([key, value]) => {
+          headers.set(key, value);
+        });
+      }
+      
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers
+      });
+      
+    } catch (error) {
+      // 5. 全局錯誤處理
+      const duration = Date.now() - startTime;
+      perfMonitor.recordRequest(false, duration, error.message);
+      
+      console.error('Worker Error:', error);
+      
+      return new Response(JSON.stringify({
+        error: {
+          message: error.message,
+          type: 'worker_error',
+          code: 'INTERNAL_ERROR',
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: corsHeaders({
+          'Content-Type': 'application/json',
+          'X-Response-Time': (Date.now() - startTime) + 'ms'
+        })
+      });
+    }
+  }
+};
 
-    // 錯誤處理
-    window.addEventListener('error', (e) => {
-      console.error('全局錯誤:', e.error);
-    });
-
-    window.addEventListener('unhandledrejection', (e) => {
-      console.error('未處理的 Promise 拒絕:', e.reason);
-    });
-  </script>
-</body>
-</html>`;
-}
-// 將所有部分組合成完整的 HTML
-function getHTML() {
-  return getHTMLStyles2() + 
-         getHTMLStyles3() + 
-         getHTMLBody1() + 
-         getHTMLBody2() + 
-         getHTMLBody3() + 
-         getHTMLScript1() + 
-         getHTMLScript2() + 
-         getHTMLScript3() + 
-         getHTMLScript4() + 
-         getHTMLScript5();
-}
+// ==================== 結束 ====================
+console.log(\`✅ \${CONFIG.PROJECT_NAME} v\${CONFIG.PROJECT_VERSION} loaded successfully!\`);
