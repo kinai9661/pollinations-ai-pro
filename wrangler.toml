@@ -1,13 +1,68 @@
-cat > wrangler.toml << 'EOF'
+# =================================================================================
+# Cloudflare Workers 配置文件
+# 項目: Flux AI Pro
+# 版本: 9.5.1-fixed
+# =================================================================================
+
+# Worker 基本配置
 name = "pollinations-ai-pro"
 main = "worker.js"
-compatibility_date = "2025-12-17"
+compatibility_date = "2024-12-17"
 
-# KV 命名空間綁定 (部署前需要創建)
+# Workers AI 綁定（可選，用於中文翻譯）
+# 如果不需要自動翻譯功能，可以註釋掉這一段
+[ai]
+binding = "AI"
+
+# 環境變量（可選）
+# 取消註釋並填入你的 API Key 以啟用認證模式
+# [vars]
+# POLLINATIONS_AUTH_ENABLED = "true"
+
+# Secret 環境變量（推薦使用此方式存儲 API Key）
+# 使用命令設置: wrangler secret put POLLINATIONS_API_KEY
+# 然後輸入你的 API Key: pol_xxxxxxxxxx
+
+# Workers 資源限制
+[limits]
+cpu_ms = 50000  # 增加 CPU 時間限制，適用於圖像生成
+
+# 自定義域名（可選）
+# 取消註釋並替換為你的域名
+# [[routes]]
+# pattern = "flux.yourdomain.com/*"
+# zone_name = "yourdomain.com"
+
+# 開發環境配置
+[env.dev]
+name = "flux-ai-pro-dev"
+# vars = { POLLINATIONS_AUTH_ENABLED = "false" }
+
+# 生產環境配置
+[env.production]
+name = "flux-ai-pro"
+# vars = { POLLINATIONS_AUTH_ENABLED = "true" }
+
+# 兼容性標誌
+# 使用最新的 Workers 運行時功能
+compatibility_flags = ["nodejs_compat"]
+
+# 觸發器配置
+# 允許所有 HTTP 方法
+# [triggers]
+# crons = []
+
+# 觀察者配置（開發時使用）
+[observability]
+enabled = true
+
+# 構建配置
+[build]
+command = ""
+watch_dirs = []
+
+# KV 命名空間（如果需要持久化存儲，可啟用）
 # [[kv_namespaces]]
-# binding = "IMAGE_HISTORY"
-# id = "YOUR_KV_NAMESPACE_ID"
-
-[vars]
-ENVIRONMENT = "production"
-EOF
+# binding = "FLUX_AI_STORAGE"
+# id = "your-kv-namespace-id"
+# preview_id = "your-preview-kv-namespace-id"
