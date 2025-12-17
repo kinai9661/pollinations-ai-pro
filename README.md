@@ -131,7 +131,7 @@ text
 
 | 變量名 | 說明 | 必需 |
 |--------|------|------|
-| `POLLINATIONS_API_KEY` | Pollinations.ai API Key | 否 |
+| `POLLINATIONS_API_KEY` | Pollinations.ai API Key | 是 |
 
 ### 🎨 使用方法
 
